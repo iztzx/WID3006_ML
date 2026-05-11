@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IntentSight</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <main class="shell" id="main-content" role="main">
+      <header class="topbar" role="banner">
+        <div>
+          <p class="eyebrow">Intent signal explorer</p>
+          <h1>IntentSight</h1>
+        </div>
+        <div class="view-toggle" role="tablist" aria-label="Dashboard view">
+          <button class="active" data-view="aggregated" role="tab" aria-selected="true">Aggregated</button>
+          <button data-view="category" role="tab" aria-selected="false">Category</button>
+          <button data-view="individual" role="tab" aria-selected="false">Individual</button>
+        </div>
+      </header>
+
+      <section class="score-strip" aria-label="Model defensibility summary">
+        <article class="metric-tile" aria-label="Best test accuracy">
+          <span>Best test accuracy</span>
+          <strong id="bestAccuracy">--</strong>
+          <small id="bestModel">Loading</small>
+        </article>
+        <article class="metric-tile warning" aria-label="Majority baseline accuracy">
+          <span>Majority baseline</span>
+          <strong id="baselineAccuracy">--</strong>
+          <small id="baselineLabel">Required comparison</small>
+        </article>
+        <article class="metric-tile" aria-label="Weighted F1 score">
+          <span>Weighted F1</span>
+          <strong id="weightedF1">--</strong>
+          <small>Exploratory signal quality</small>
+        </article>
+        <article class="metric-tile" aria-label="Test set size">
+          <span>Test rows</span>
+          <strong id="testRows">--</strong>
+          <small>Held-out evaluation set</small>
+        </article>
+        <article class="metric-tile" aria-label="Nested cross-validation">
+          <span>Nested CV (mean ± std)</span>
+          <strong id="nestedCV">--</strong>
+          <small>Outer 5-fold, inner 3-fold</small>
+        </article>
+      </section>
+
+      <div id="loadingOverlay" class="loading-overlay" aria-hidden="true">
+        <div class="loading-spinner" role="status"></div>
+        <p>Loading model &amp; data…</p>
+      </div>
+
+      <section class="workspace" id="main-content-section">
+        <aside class="panel controls" role="complementary" aria-label="Dashboard controls">
+          <label for="metricSelect">Behavior metric</label>
+          <select id="metricSelect" aria-label="Behavior metric"></select>
+
+          <label for="categorySelect">Category split</label>
+          <select id="categorySelect" aria-label="Category split"></select>
+
+          <label for="heatmapX">Heat map columns</label>
+          <select id="heatmapX" aria-label="Heat map column axis"></select>
+
+          <label for="heatmapY">Heat map rows</label>
+          <select id="heatmapY" aria-label="Heat map row axis"></select>
+
+          <div class="notice" role="note">
+            <strong>Model caveat</strong>
+            <p id="defensibilityNote">Loading model context.</p>
+          </div>
+        </aside>
+
+        <section class="main-grid" aria-label="Dashboard panels">
+          <article class="panel chart-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Absolute cohort volumes</p>
+                <h2 id="chartTitle">Cohort trend</h2>
+              </div>
+              <span id="healthBadge" class="badge" aria-label="Health status">Checking artifacts</span>
+            </div>
+            <div id="lineChart" class="line-chart" role="img" aria-label="Cohort trend chart"></div>
+            <div id="tooltip" class="tooltip" hidden role="tooltip"></div>
+          </article>
+
+          <article class="panel heat-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Prediction density</p>
+                <h2 id="heatmapTitle">Behavior heat map</h2>
+              </div>
+            </div>
+            <div id="heatmap" class="heatmap" role="img" aria-label="Behavior heatmap"></div>
+          </article>
+
+          <article class="panel compare-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Model comparison</p>
+                <h2>Baseline pressure test</h2>
+              </div>
+            </div>
+            <div id="comparisonBars" class="bars" role="list" aria-label="Model comparison bars"></div>
+          </article>
+
+          <article class="panel scenario-panel">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Exploratory scenario</p>
+                <h2>Single profile signal</h2>
+              </div>
+            </div>
+            <form id="scenarioForm" class="scenario-form" aria-label="Scenario prediction form">
+              <label for="inpUsage">Usage min</label>
+              <input id="inpUsage" name="app_usage_time_min" type="number" min="0" value="120" />
+
+              <label for="inpSwipe">Swipe ratio</label>
+              <input id="inpSwipe" name="swipe_right_ratio" type="number" min="0" max="1" step="0.01" value="0.50" />
+
+              <label for="inpLikes">Likes</label>
+              <input id="inpLikes" name="likes_received" type="number" min="0" value="50" />
+
+              <label for="inpMatches">Matches</label>
+              <input id="inpMatches" name="mutual_matches" type="number" min="0" value="10" />
+
+              <label for="inpMsgs">Messages sent</label>
+              <input id="inpMsgs" name="message_sent_count" type="number" min="0" value="30" />
+
+              <label for="inpBio">Bio length</label>
+              <input id="inpBio" name="bio_length" type="number" min="0" value="140" />
+
+              <label for="inpEmoji">Emoji rate</label>
+              <input id="inpEmoji" name="emoji_usage_rate" type="number" min="0" value="0.3" step="0.01" />
+
+              <label for="inpHeight">Height cm</label>
+              <input id="inpHeight" name="height_cm" type="number" min="80" max="250" value="170" />
+
+              <label for="inpWeight">Weight kg</label>
+              <input id="inpWeight" name="weight_kg" type="number" min="20" max="300" value="70" />
+
+              <label for="inpPics">Profile pics</label>
+              <input id="inpPics" name="profile_pics_count" type="number" min="0" value="3" />
+
+              <label for="inpActive">Last active hour</label>
+              <input id="inpActive" name="last_active_hour" type="number" min="0" max="23" value="12" />
+
+              <button type="submit">Run signal</button>
+            </form>
+            <div id="predictionResult" class="prediction-result" role="alert" aria-live="polite">Awaiting scenario.</div>
+          </article>
+        </section>
+      </section>
+
+      <section class="activity-log" aria-label="Recent predictions">
+        <h2>Recent Predictions <span class="log-count" id="logCount">(0)</span></h2>
+        <div id="activityLog" class="activity-entries" aria-live="polite"></div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
