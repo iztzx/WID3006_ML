@@ -109,10 +109,10 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     for tag_list in tags_series:
         all_tags.update(tag_list)
     all_tags.discard("")
-    all_tags = sorted(all_tags)
-    logger.info("  Found %d unique interest tags", len(all_tags))
+    sorted_tags = sorted(all_tags)
+    logger.info("  Found %d unique interest tags", len(sorted_tags))
 
-    for tag in all_tags:
+    for tag in sorted_tags:
         df[f"tag_{tag}"] = tags_series.apply(lambda x: 1 if tag in x else 0)
     df["num_interests"] = tags_series.apply(len)
 

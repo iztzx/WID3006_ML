@@ -522,8 +522,8 @@ joblib.dump(selected_unbiased, OUTPUT_PATH / "selected_features.pkl")
 joblib.dump(scaler, OUTPUT_PATH / "scaler.pkl")
 
 logger.info("  Artifacts saved to %s", OUTPUT_PATH)
-for f in sorted(OUTPUT_PATH.iterdir()):
-    logger.info("    %s", f.name)
+for artifact in sorted(OUTPUT_PATH.iterdir()):
+    logger.info("    %s", artifact.name)
 
 
 # =============================================================================
