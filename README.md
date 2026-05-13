@@ -30,6 +30,17 @@ streamlit run streamlit_app.py
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+## Google Colab (No Local Setup)
+
+Can't run locally? Use the Colab notebook — it runs the full pipeline in the browser:
+
+1. Open in Google Colab: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iztzx/WID3006_ML/blob/main/IntentSight_Colab.ipynb)
+2. Upload `Behaviour_Extended_Dataset.csv` when prompted (or mount Google Drive)
+3. Run all cells — the notebook handles installs, preprocessing, training, tuning, SHAP, and artifact export
+4. Download the generated `ML_Results/` zip for the trained model and artifacts
+
+**Runtime:** ~10–15 minutes on a free T4 GPU runtime.
+
 ## Docker (Tier 3)
 
 ```bash
@@ -70,6 +81,7 @@ Backward-compatible `/api/` aliases are also available.
 ├── docker-compose.yml       # Multi-service deployment
 ├── Dockerfile               # FastAPI container
 ├── Dockerfile.streamlit     # Streamlit container
+├── IntentSight_Colab.ipynb  # Google Colab notebook (full pipeline)
 ├── tests/                   # pytest test suite
 ├── ML_Results/              # Generated model artifacts
 ├── Preprocessed_Data_V2/    # Preprocessed data artifacts
