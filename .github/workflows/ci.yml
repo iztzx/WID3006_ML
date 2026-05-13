@@ -28,13 +28,19 @@ jobs:
 
       - name: Lint with Ruff
         run: |
-          pip install ruff
           ruff check . --exit-non-zero-on-fix
           ruff format . --check
 
       - name: Type check with mypy
         run: |
-          mypy --ignore-missing-imports app/ tests/ logging_config.py feature_store.py performance_tracker.py
+          mypy --ignore-missing-imports \
+            app/ \
+            tests/ \
+            preprocess.py \
+            train.py \
+            feature_store.py \
+            performance_tracker.py \
+            logging_config.py
 
       - name: Run tests
         run: |

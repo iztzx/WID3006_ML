@@ -2,8 +2,8 @@
 
 **User Intent Signal Explorer** — WID3006 ML Group Assignment ("Tying the Data Knot")
 
-A production-style data product that classifies dating-app user intent from
-behavioural features. Ships with three deployment tiers:
+A production-style data product that classifies dating-app user engagement levels
+from behavioural features. Ships with three deployment tiers:
 
 | Tier | Stack | Entry Point |
 | --- | --- | --- |
@@ -17,13 +17,16 @@ behavioural features. Ships with three deployment tiers:
 # 1. Install dependencies
 python -m pip install -r requirements.txt
 
-# 2. Run the ML pipeline (generates artifacts in ML_Results/)
-python Machine_Learning_V2.py
+# 2. Run preprocessing (generates artifacts in Preprocessed_Data_V2/)
+python preprocess.py
 
-# 3a. Launch Streamlit dashboard (Tier 1)
+# 3. Run ML pipeline (generates artifacts in ML_Results/)
+python train.py
+
+# 4a. Launch Streamlit dashboard (Tier 1)
 streamlit run streamlit_app.py
 
-# 3b. OR launch FastAPI (Tier 2)
+# 4b. OR launch FastAPI (Tier 2)
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
@@ -59,8 +62,8 @@ Backward-compatible `/api/` aliases are also available.
 │   ├── main.py              # API routes and lifespan
 │   └── services/            # Model + data services
 ├── streamlit_app.py         # Streamlit dashboard (Tier 1)
-├── Machine_Learning_V2.py   # ML pipeline (8 models, nested CV, calibration)
-├── Data_Preprocessing_V2.py # Data preprocessing pipeline
+├── preprocess.py            # Data preprocessing & target construction
+├── train.py                 # ML pipeline (6 models, CV, tuning, SHAP, calibration)
 ├── feature_store.py         # Feature registry
 ├── performance_tracker.py   # Drift detection (PSI, KS)
 ├── logging_config.py        # Structured JSON logging
@@ -75,6 +78,4 @@ Backward-compatible `/api/` aliases are also available.
 
 ## Documentation
 
-- [RUN_INTENTSIGHT.md](RUN_INTENTSIGHT.md) — Full Windows/VS Code runbook
-- [MODEL_CARD.md](MODEL_CARD.md) — Model card with intended use, limitations, and fairness notes
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) — Contribution guide

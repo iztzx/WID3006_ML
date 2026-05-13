@@ -10,19 +10,11 @@ import json
 from pathlib import Path
 
 import joblib
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import seaborn as sns
 import streamlit as st
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    confusion_matrix,
-    f1_score,
-)
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -44,6 +36,7 @@ st.set_page_config(
 # ---------------------------------------------------------------------------
 # Cached loaders
 # ---------------------------------------------------------------------------
+
 
 @st.cache_resource
 def load_model():
@@ -120,6 +113,7 @@ def load_predictions_log():
 # Feature importance (from SHAP or saved CSV)
 # ---------------------------------------------------------------------------
 
+
 @st.cache_data
 def load_feature_importance():
     csv_path = RESULTS_DIR / "final_comparison.csv"
@@ -146,15 +140,13 @@ page = st.sidebar.radio(
     ],
 )
 st.sidebar.markdown("---")
-st.sidebar.markdown(
-    "WID3006 ML Group Assignment  \n"
-    "\"Tying the (Data) Knot\""
-)
+st.sidebar.markdown('WID3006 ML Group Assignment  \n"Tying the (Data) Knot"')
 
 
 # ===========================================================================
 # PAGE: Overview
 # ===========================================================================
+
 
 def page_overview():
     st.title("IntentSight — Overview")
@@ -216,6 +208,7 @@ def page_overview():
 # PAGE: Model Comparison
 # ===========================================================================
 
+
 def page_model_comparison():
     st.title("Model Comparison")
 
@@ -225,13 +218,15 @@ def page_model_comparison():
     if comparison is not None:
         st.subheader("Base Model Results")
         st.dataframe(
-            comparison.style.format({
-                "CV Accuracy (mean)": "{:.4f}",
-                "CV Accuracy (std)": "{:.4f}",
-                "Test Accuracy": "{:.4f}",
-                "Test F1 (weighted)": "{:.4f}",
-                "Train Time (s)": "{:.1f}",
-            }),
+            comparison.style.format(
+                {
+                    "CV Accuracy (mean)": "{:.4f}",
+                    "CV Accuracy (std)": "{:.4f}",
+                    "Test Accuracy": "{:.4f}",
+                    "Test F1 (weighted)": "{:.4f}",
+                    "Train Time (s)": "{:.1f}",
+                }
+            ),
             use_container_width=True,
         )
 
@@ -254,10 +249,12 @@ def page_model_comparison():
     if nested is not None:
         st.subheader("Nested Cross-Validation (Outer 5-Fold)")
         st.dataframe(
-            nested.style.format({
-                "Nested CV Mean": "{:.4f}",
-                "Nested CV Std": "{:.4f}",
-            }),
+            nested.style.format(
+                {
+                    "Nested CV Mean": "{:.4f}",
+                    "Nested CV Std": "{:.4f}",
+                }
+            ),
             use_container_width=True,
         )
 
@@ -271,6 +268,7 @@ def page_model_comparison():
 # ===========================================================================
 # PAGE: Feature Importance
 # ===========================================================================
+
 
 def page_feature_importance():
     st.title("Feature Importance")
@@ -324,6 +322,7 @@ def page_feature_importance():
 # PAGE: Scenario Predictor
 # ===========================================================================
 
+
 def page_scenario_predictor():
     st.title("Scenario Predictor")
     st.markdown(
@@ -336,13 +335,12 @@ def page_scenario_predictor():
     artifacts = load_artifacts()
 
     if model is None:
-        st.error(
-            "Model artifacts not found in `ML_Results/`. "
-            "Run `train.py` first."
-        )
+        st.error("Model artifacts not found in `ML_Results/`. Run `train.py` first.")
         return
 
-    if not all(k in artifacts for k in ["target_encoder", "scaler", "selected_features"]):
+    if not all(
+        k in artifacts for k in ["target_encoder", "scaler", "selected_features"]
+    ):
         st.error("Preprocessing artifacts missing from `Preprocessed_Data_V2/`.")
         return
 
@@ -379,9 +377,7 @@ def page_scenario_predictor():
 
     if st.button("Predict Intent", type="primary", use_container_width=True):
         # Build input vector
-        input_df = pd.DataFrame(
-            np.zeros((1, len(full_columns))), columns=full_columns
-        )
+        input_df = pd.DataFrame(np.zeros((1, len(full_columns))), columns=full_columns)
 
         values = {
             "app_usage_time_min": app_usage,
@@ -409,9 +405,7 @@ def page_scenario_predictor():
                 input_df.at[0, col] = val
 
         # Scale and select
-        scaled = pd.DataFrame(
-            scaler.transform(input_df), columns=full_columns
-        )
+        scaled = pd.DataFrame(scaler.transform(input_df), columns=full_columns)
         selected = scaled[selected_features]
 
         # Predict
@@ -428,10 +422,12 @@ def page_scenario_predictor():
         # Probabilities
         if hasattr(model, "predict_proba"):
             proba = model.predict_proba(selected)
-            prob_df = pd.DataFrame({
-                "Class": encoder.inverse_transform(range(proba.shape[1])),
-                "Probability": proba[0],
-            }).sort_values("Probability", ascending=False)
+            prob_df = pd.DataFrame(
+                {
+                    "Class": encoder.inverse_transform(range(proba.shape[1])),
+                    "Probability": proba[0],
+                }
+            ).sort_values("Probability", ascending=False)
 
             col_a, col_b = st.columns(2)
             with col_a:
@@ -443,20 +439,22 @@ def page_scenario_predictor():
                 )
             with col_b:
                 confidence = float(np.max(proba))
-                fig = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=confidence * 100,
-                    title={"text": "Confidence (%)"},
-                    gauge={
-                        "axis": {"range": [0, 100]},
-                        "bar": {"color": "darkblue"},
-                        "steps": [
-                            {"range": [0, 50], "color": "lightcoral"},
-                            {"range": [50, 80], "color": "lightyellow"},
-                            {"range": [80, 100], "color": "lightgreen"},
-                        ],
-                    },
-                ))
+                fig = go.Figure(
+                    go.Indicator(
+                        mode="gauge+number",
+                        value=confidence * 100,
+                        title={"text": "Confidence (%)"},
+                        gauge={
+                            "axis": {"range": [0, 100]},
+                            "bar": {"color": "darkblue"},
+                            "steps": [
+                                {"range": [0, 50], "color": "lightcoral"},
+                                {"range": [50, 80], "color": "lightyellow"},
+                                {"range": [80, 100], "color": "lightgreen"},
+                            ],
+                        },
+                    )
+                )
                 fig.update_layout(height=300)
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -485,6 +483,7 @@ def page_scenario_predictor():
 # PAGE: Data Explorer
 # ===========================================================================
 
+
 def page_data_explorer():
     st.title("Data Explorer")
 
@@ -504,9 +503,13 @@ def page_data_explorer():
         return
 
     raw = pd.read_csv(raw_path)
-    st.markdown(f"**Source:** `{raw_path.name}`  |  **Rows:** {len(raw):,}  |  **Columns:** {raw.shape[1]}")
+    st.markdown(
+        f"**Source:** `{raw_path.name}`  |  **Rows:** {len(raw):,}  |  **Columns:** {raw.shape[1]}"
+    )
 
-    tab_preview, tab_stats, tab_dist = st.tabs(["Preview", "Statistics", "Distributions"])
+    tab_preview, tab_stats, tab_dist = st.tabs(
+        ["Preview", "Statistics", "Distributions"]
+    )
 
     with tab_preview:
         st.dataframe(raw.head(100), use_container_width=True)
@@ -521,7 +524,9 @@ def page_data_explorer():
             fig = px.histogram(
                 raw,
                 x=selected_col,
-                color="relationship_intent" if "relationship_intent" in raw.columns else None,
+                color="relationship_intent"
+                if "relationship_intent" in raw.columns
+                else None,
                 barmode="overlay",
                 opacity=0.7,
                 title=f"Distribution of {selected_col}",
@@ -542,6 +547,7 @@ def page_data_explorer():
 # PAGE: Audit Log
 # ===========================================================================
 
+
 def page_audit_log():
     st.title("Prediction Audit Log")
     st.markdown("History of all predictions made through the API and dashboard.")
@@ -549,7 +555,9 @@ def page_audit_log():
     records = load_predictions_log()
 
     if not records:
-        st.info("No predictions logged yet. Make a prediction via the API or Scenario Predictor.")
+        st.info(
+            "No predictions logged yet. Make a prediction via the API or Scenario Predictor."
+        )
         return
 
     # Parse into DataFrame
@@ -557,13 +565,15 @@ def page_audit_log():
     for rec in records:
         payload = rec.get("payload", {})
         result = rec.get("result", {})
-        rows.append({
-            "timestamp": rec.get("timestamp", ""),
-            "prediction": result.get("prediction", ""),
-            "confidence": result.get("confidence", None),
-            "app_usage": payload.get("app_usage_time_min", None),
-            "swipe_ratio": payload.get("swipe_right_ratio", None),
-        })
+        rows.append(
+            {
+                "timestamp": rec.get("timestamp", ""),
+                "prediction": result.get("prediction", ""),
+                "confidence": result.get("confidence", None),
+                "app_usage": payload.get("app_usage_time_min", None),
+                "swipe_ratio": payload.get("swipe_right_ratio", None),
+            }
+        )
 
     df = pd.DataFrame(rows)
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
@@ -580,7 +590,9 @@ def page_audit_log():
 
     with col2:
         if "confidence" in df.columns and df["confidence"].notna().any():
-            fig = px.histogram(df, x="confidence", nbins=20, title="Confidence Distribution")
+            fig = px.histogram(
+                df, x="confidence", nbins=20, title="Confidence Distribution"
+            )
             st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Recent Predictions")

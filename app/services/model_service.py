@@ -17,7 +17,9 @@ import pandas as pd
 try:
     from logging_config import logger
 except ImportError:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     logger = logging.getLogger("intentsight")
 
 
@@ -127,12 +129,17 @@ class ModelService:
     def metrics(self) -> dict[str, Any]:
         comparison = self.final_comparison().copy()
         numeric_cols = [
-            "CV Accuracy (mean)", "CV Accuracy (std)",
-            "Test Accuracy", "Test F1 (weighted)", "Train Time (s)",
+            "CV Accuracy (mean)",
+            "CV Accuracy (std)",
+            "Test Accuracy",
+            "Test F1 (weighted)",
+            "Train Time (s)",
         ]
         for col in numeric_cols:
             if col in comparison:
-                comparison[col] = pd.to_numeric(comparison[col], errors="coerce").fillna(0)
+                comparison[col] = pd.to_numeric(
+                    comparison[col], errors="coerce"
+                ).fillna(0)
 
         y_test = self.y_test()
         distribution = y_test.value_counts().sort_index()
@@ -192,11 +199,13 @@ class ModelService:
         else:
             confidence = np.full(len(encoded), np.nan)
 
-        return pd.DataFrame({
-            "prediction_encoded": encoded,
-            "prediction_label": labels,
-            "confidence": confidence,
-        })
+        return pd.DataFrame(
+            {
+                "prediction_encoded": encoded,
+                "prediction_label": labels,
+                "confidence": confidence,
+            }
+        )
 
     def _check_ood(self, scaled_df: pd.DataFrame) -> dict[str, Any]:
         """Flag out-of-distribution inputs based on training ranges."""
@@ -242,9 +251,7 @@ class ModelService:
         full_columns = self.full_columns()
         selected_features = self.selected_features()
 
-        input_df = pd.DataFrame(
-            np.zeros((1, len(full_columns))), columns=full_columns
-        )
+        input_df = pd.DataFrame(np.zeros((1, len(full_columns))), columns=full_columns)
 
         values = dict(payload)
 
@@ -252,9 +259,13 @@ class ModelService:
         if "height_cm" in values and "weight_kg" in values and values["height_cm"] > 0:
             values["bmi"] = values["weight_kg"] / ((values["height_cm"] / 100) ** 2)
         if "mutual_matches" in values and "likes_received" in values:
-            values["match_rate"] = values["mutual_matches"] / (values["likes_received"] + 1)
+            values["match_rate"] = values["mutual_matches"] / (
+                values["likes_received"] + 1
+            )
         if "message_sent_count" in values and "mutual_matches" in values:
-            values["msg_per_match"] = values["message_sent_count"] / (values["mutual_matches"] + 1)
+            values["msg_per_match"] = values["message_sent_count"] / (
+                values["mutual_matches"] + 1
+            )
         # Note: engagement_score is not a model feature (used only for target construction)
 
         for col, val in values.items():

@@ -12,6 +12,7 @@ import warnings
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -34,7 +35,9 @@ from imblearn.pipeline import Pipeline
 try:
     from logging_config import logger
 except ImportError:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     logger = logging.getLogger("intentsight")
 
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -63,7 +66,12 @@ selected_features = joblib.load(PREPROCESSED_DIR / "selected_features.pkl")
 scaler = joblib.load(PREPROCESSED_DIR / "scaler.pkl")
 
 n_classes = len(target_encoder.classes_)
-logger.info("  Train: %s | Test: %s | Classes: %s", X_train.shape, X_test.shape, list(target_encoder.classes_))
+logger.info(
+    "  Train: %s | Test: %s | Classes: %s",
+    X_train.shape,
+    X_test.shape,
+    list(target_encoder.classes_),
+)
 
 
 # =============================================================================
@@ -82,24 +90,46 @@ models = {
         LogisticRegression(max_iter=2000, random_state=42)
     ),
     "Random Forest": make_pipeline(
-        RandomForestClassifier(n_estimators=300, max_depth=20, random_state=42, n_jobs=-1)
+        RandomForestClassifier(
+            n_estimators=300, max_depth=20, random_state=42, n_jobs=-1
+        )
     ),
     "Gradient Boosting": make_pipeline(
-        GradientBoostingClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
+        GradientBoostingClassifier(
+            n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42
+        )
     ),
     "XGBoost": make_pipeline(
-        XGBClassifier(n_estimators=300, max_depth=6, learning_rate=0.1,
-                      subsample=0.8, colsample_bytree=0.8, reg_alpha=0.1,
-                      random_state=42, n_jobs=-1, verbosity=0, eval_metric="mlogloss")
+        XGBClassifier(
+            n_estimators=300,
+            max_depth=6,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_alpha=0.1,
+            random_state=42,
+            n_jobs=-1,
+            verbosity=0,
+            eval_metric="mlogloss",
+        )
     ),
     "LightGBM": make_pipeline(
-        LGBMClassifier(n_estimators=300, max_depth=8, learning_rate=0.1,
-                       subsample=0.8, colsample_bytree=0.8, reg_alpha=0.1,
-                       random_state=42, n_jobs=-1, verbose=-1)
+        LGBMClassifier(
+            n_estimators=300,
+            max_depth=8,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_alpha=0.1,
+            random_state=42,
+            n_jobs=-1,
+            verbose=-1,
+        )
     ),
     "CatBoost": make_pipeline(
-        CatBoostClassifier(iterations=300, depth=6, learning_rate=0.1,
-                           random_state=42, verbose=0)
+        CatBoostClassifier(
+            iterations=300, depth=6, learning_rate=0.1, random_state=42, verbose=0
+        )
     ),
 }
 
@@ -109,25 +139,37 @@ for name, pipeline in models.items():
     logger.info("  Training %s...", name)
     t0 = pd.Timestamp.now()
 
-    cv_scores = cross_val_score(pipeline, X_train, y_train, cv=cv, scoring="accuracy", n_jobs=-1)
+    cv_scores = cross_val_score(
+        pipeline, X_train, y_train, cv=cv, scoring="accuracy", n_jobs=-1
+    )
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
     test_acc = accuracy_score(y_test, y_pred)
     test_f1 = f1_score(y_test, y_pred, average="weighted")
     elapsed = (pd.Timestamp.now() - t0).total_seconds()
 
-    base_results.append({
-        "Model": name,
-        "CV Accuracy (mean)": round(cv_scores.mean(), 4),
-        "CV Accuracy (std)": round(cv_scores.std(), 4),
-        "Test Accuracy": round(test_acc, 4),
-        "Test F1 (weighted)": round(test_f1, 4),
-        "Train Time (s)": round(elapsed, 1),
-    })
-    logger.info("    CV: %.4f +/- %.4f | Test: %.4f | F1: %.4f | %.1fs",
-                cv_scores.mean(), cv_scores.std(), test_acc, test_f1, elapsed)
+    base_results.append(
+        {
+            "Model": name,
+            "CV Accuracy (mean)": round(cv_scores.mean(), 4),
+            "CV Accuracy (std)": round(cv_scores.std(), 4),
+            "Test Accuracy": round(test_acc, 4),
+            "Test F1 (weighted)": round(test_f1, 4),
+            "Train Time (s)": round(elapsed, 1),
+        }
+    )
+    logger.info(
+        "    CV: %.4f +/- %.4f | Test: %.4f | F1: %.4f | %.1fs",
+        cv_scores.mean(),
+        cv_scores.std(),
+        test_acc,
+        test_f1,
+        elapsed,
+    )
 
-base_results_df = pd.DataFrame(base_results).sort_values("Test Accuracy", ascending=False)
+base_results_df = pd.DataFrame(base_results).sort_values(
+    "Test Accuracy", ascending=False
+)
 print("\n--- Base Model Comparison ---")
 print(base_results_df.to_string(index=False))
 
@@ -214,8 +256,14 @@ for name in top3_names:
     }
     tuned_pipelines[name] = best_pipe
 
-    logger.info("    Best CV: %.4f | Test: %.4f | F1: %.4f | %.1fs | %s",
-                search.best_score_, test_acc, test_f1, elapsed, search.best_params_)
+    logger.info(
+        "    Best CV: %.4f | Test: %.4f | F1: %.4f | %.1fs | %s",
+        search.best_score_,
+        test_acc,
+        test_f1,
+        elapsed,
+        search.best_params_,
+    )
 
 
 # =============================================================================
@@ -225,13 +273,20 @@ logger.info("STEP 4: Selecting best model and calibrating...")
 
 all_candidates = []
 for r in base_results:
-    all_candidates.append({"name": r["Model"], "test_acc": r["Test Accuracy"], "source": "base"})
+    all_candidates.append(
+        {"name": r["Model"], "test_acc": r["Test Accuracy"], "source": "base"}
+    )
 for name, r in tuned_results.items():
     all_candidates.append({"name": name, "test_acc": r["test_acc"], "source": "tuned"})
 
 best_candidate = max(all_candidates, key=lambda x: x["test_acc"])
 best_name = best_candidate["name"]
-logger.info("  Best: %s (%s) — Test Acc: %.4f", best_name, best_candidate["source"], best_candidate["test_acc"])
+logger.info(
+    "  Best: %s (%s) — Test Acc: %.4f",
+    best_name,
+    best_candidate["source"],
+    best_candidate["test_acc"],
+)
 
 if best_name in tuned_pipelines:
     best_pipeline = tuned_pipelines[best_name]
@@ -240,10 +295,12 @@ else:
 
 # Calibrate
 base_estimator = best_pipeline.named_steps["model"]
-calibrated_pipeline = Pipeline([
-    ("smote", SMOTE(random_state=42)),
-    ("model", CalibratedClassifierCV(base_estimator, method="sigmoid", cv=3)),
-])
+calibrated_pipeline = Pipeline(
+    [
+        ("smote", SMOTE(random_state=42)),
+        ("model", CalibratedClassifierCV(base_estimator, method="sigmoid", cv=3)),
+    ]
+)
 calibrated_pipeline.fit(X_train, y_train)
 
 y_pred_cal = calibrated_pipeline.predict(X_test)
@@ -275,7 +332,9 @@ plt.close()
 # =============================================================================
 logger.info("STEP 5: SHAP interpretability...")
 
-shap_model = RandomForestClassifier(n_estimators=200, max_depth=15, random_state=42, n_jobs=-1)
+shap_model = RandomForestClassifier(
+    n_estimators=200, max_depth=15, random_state=42, n_jobs=-1
+)
 shap_model.fit(X_train, y_train)
 
 SHAP_SAMPLE_SIZE = 1000
@@ -310,20 +369,30 @@ logger.info("  SHAP plots saved.")
 logger.info("STEP 6: Feature importance...")
 
 importances = shap_model.feature_importances_
-importance_df = pd.DataFrame({
-    "Feature": X_train.columns,
-    "Importance": importances,
-}).sort_values("Importance", ascending=False)
+importance_df = pd.DataFrame(
+    {
+        "Feature": X_train.columns,
+        "Importance": importances,
+    }
+).sort_values("Importance", ascending=False)
 
 importance_df["Cumulative"] = importance_df["Importance"].cumsum()
 threshold = 0.95 * importance_df["Importance"].sum()
-selected_unbiased = importance_df[importance_df["Cumulative"] <= threshold]["Feature"].tolist()
+selected_unbiased = importance_df[importance_df["Cumulative"] <= threshold][
+    "Feature"
+].tolist()
 if len(selected_unbiased) < 20:
     selected_unbiased = importance_df.head(20)["Feature"].tolist()
 
 plt.figure(figsize=(10, 8))
-sns.barplot(x="Importance", y="Feature", data=importance_df.head(20), palette="magma",
-            hue="Feature", legend=False)
+sns.barplot(
+    x="Importance",
+    y="Feature",
+    data=importance_df.head(20),
+    palette="magma",
+    hue="Feature",
+    legend=False,
+)
 plt.title("Top 20 Feature Importances", fontsize=14)
 plt.tight_layout()
 plt.savefig(OUTPUT_PATH / "feature_importance_unbiased.png", dpi=150)
@@ -340,35 +409,45 @@ logger.info("STEP 7: Building final comparison table...")
 final_results = base_results.copy()
 
 for name, r in tuned_results.items():
-    final_results.append({
-        "Model": f"{name} (tuned)",
-        "CV Accuracy (mean)": r["cv_score"],
-        "CV Accuracy (std)": 0,
-        "Test Accuracy": r["test_acc"],
-        "Test F1 (weighted)": r["test_f1"],
-        "Train Time (s)": 0,
-    })
+    final_results.append(
+        {
+            "Model": f"{name} (tuned)",
+            "CV Accuracy (mean)": r["cv_score"],
+            "CV Accuracy (std)": 0,
+            "Test Accuracy": r["test_acc"],
+            "Test F1 (weighted)": r["test_f1"],
+            "Train Time (s)": 0,
+        }
+    )
 
-final_results.append({
-    "Model": f"{best_name} (calibrated)",
-    "CV Accuracy (mean)": 0,
-    "CV Accuracy (std)": 0,
-    "Test Accuracy": round(cal_acc, 4),
-    "Test F1 (weighted)": round(cal_f1, 4),
-    "Train Time (s)": 0,
-})
+final_results.append(
+    {
+        "Model": f"{best_name} (calibrated)",
+        "CV Accuracy (mean)": 0,
+        "CV Accuracy (std)": 0,
+        "Test Accuracy": round(cal_acc, 4),
+        "Test F1 (weighted)": round(cal_f1, 4),
+        "Train Time (s)": 0,
+    }
+)
 
 # Majority baseline
-final_results.append({
-    "Model": "Majority Baseline",
-    "CV Accuracy (mean)": round(max(np.bincount(y_train)) / len(y_train), 4),
-    "CV Accuracy (std)": 0,
-    "Test Accuracy": round(max(np.bincount(y_test)) / len(y_test), 4),
-    "Test F1 (weighted)": 0,
-    "Train Time (s)": 0,
-})
+final_results.append(
+    {
+        "Model": "Majority Baseline",
+        "CV Accuracy (mean)": round(max(np.bincount(y_train)) / len(y_train), 4),
+        "CV Accuracy (std)": 0,
+        "Test Accuracy": round(max(np.bincount(y_test)) / len(y_test), 4),
+        "Test F1 (weighted)": 0,
+        "Train Time (s)": 0,
+    }
+)
 
-final_df = pd.DataFrame(final_results).sort_values("Test Accuracy", ascending=False).reset_index(drop=True)
+final_df = (
+    pd.DataFrame(final_results)
+    .sort_values("Test Accuracy", ascending=False)
+    .reset_index(drop=True)
+)
 
 print("\n" + "=" * 60)
 print("FINAL MODEL COMPARISON")
@@ -385,15 +464,29 @@ logger.info("STEP 8: Generating visualizations...")
 
 fig, axes = plt.subplots(1, 2, figsize=(16, 6))
 
-sns.barplot(x="Test Accuracy", y="Model", data=final_df, palette="viridis", ax=axes[0],
-            hue="Model", legend=False)
+sns.barplot(
+    x="Test Accuracy",
+    y="Model",
+    data=final_df,
+    palette="viridis",
+    ax=axes[0],
+    hue="Model",
+    legend=False,
+)
 axes[0].set_title("Test Accuracy by Model", fontsize=14)
 axes[0].set_xlim(final_df["Test Accuracy"].min() - 0.02, 1.0)
 
 nonzero_f1 = final_df[final_df["Test F1 (weighted)"] > 0].copy()
 if len(nonzero_f1) > 0:
-    sns.barplot(x="Test F1 (weighted)", y="Model", data=nonzero_f1, palette="magma", ax=axes[1],
-                hue="Model", legend=False)
+    sns.barplot(
+        x="Test F1 (weighted)",
+        y="Model",
+        data=nonzero_f1,
+        palette="magma",
+        ax=axes[1],
+        hue="Model",
+        legend=False,
+    )
     axes[1].set_title("Test F1 (Weighted) by Model", fontsize=14)
     axes[1].set_xlim(nonzero_f1["Test F1 (weighted)"].min() - 0.02, 1.0)
 
@@ -437,5 +530,7 @@ for f in sorted(OUTPUT_PATH.iterdir()):
 # DONE
 # =============================================================================
 logger.info("=" * 60)
-logger.info("ML Pipeline Complete! Best: %s (calibrated) — Acc: %.4f", best_name, cal_acc)
+logger.info(
+    "ML Pipeline Complete! Best: %s (calibrated) — Acc: %.4f", best_name, cal_acc
+)
 logger.info("=" * 60)

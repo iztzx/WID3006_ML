@@ -78,9 +78,7 @@ class PerformanceTracker:
         return float(round(psi, 6))
 
     @staticmethod
-    def ks_test(
-        expected: np.ndarray, actual: np.ndarray
-    ) -> tuple[float, float]:
+    def ks_test(expected: np.ndarray, actual: np.ndarray) -> tuple[float, float]:
         """Two-sample Kolmogorov-Smirnov test returning (statistic, p-value)."""
         from scipy.stats import ks_2samp  # lazy import — scipy is optional
 

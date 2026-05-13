@@ -19,7 +19,10 @@ try:
     from logging_config import logger
 except ImportError:
     import logging
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     logger = logging.getLogger("intentsight")
 
 
@@ -56,7 +59,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # tighten in production
+    allow_origins=["*"],  # tighten in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -87,6 +90,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ---------------------------------------------------------------------------
 class ScenarioPayload(BaseModel):
     """Single profile for point prediction."""
+
     app_usage_time_min: float = Field(120, ge=0, le=1000)
     swipe_right_ratio: float = Field(0.5, ge=0, le=1)
     likes_received: float = Field(50, ge=0, le=10000)
@@ -102,11 +106,13 @@ class ScenarioPayload(BaseModel):
 
 class BatchPayload(BaseModel):
     """Batch of scenarios for bulk prediction."""
+
     scenarios: list[ScenarioPayload]
 
 
 class BatchResponse(BaseModel):
     """Batch prediction result."""
+
     predictions: list[dict]
     count: int
 
@@ -115,6 +121,7 @@ class BatchResponse(BaseModel):
 # Route helpers — access services from app.state (set by lifespan) with
 # a fallback to the module-level singletons for compatibility.
 # ---------------------------------------------------------------------------
+
 
 def get_model_service() -> ModelService:
     try:

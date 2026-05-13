@@ -26,22 +26,37 @@ class FeatureStore:
 
     # --- Raw columns from the behaviour dataset ---
     RAW_NUMERIC: ClassVar[list[str]] = [
-        "age", "app_usage_time_min", "likes_received",
-        "mutual_matches", "message_sent_count", "bio_length",
-        "emoji_usage_rate", "height_cm", "weight_kg",
-        "profile_pics_count", "last_active_hour",
+        "age",
+        "app_usage_time_min",
+        "likes_received",
+        "mutual_matches",
+        "message_sent_count",
+        "bio_length",
+        "emoji_usage_rate",
+        "height_cm",
+        "weight_kg",
+        "profile_pics_count",
+        "last_active_hour",
     ]
 
     RAW_CATEGORICAL: ClassVar[list[str]] = [
-        "gender", "income_bracket", "education_level",
-        "sexual_orientation", "location_type", "swipe_time_of_day",
-        "body_type", "interest_tags",
+        "gender",
+        "income_bracket",
+        "education_level",
+        "sexual_orientation",
+        "location_type",
+        "swipe_time_of_day",
+        "body_type",
+        "interest_tags",
     ]
 
     # --- Behavioral features used to construct engagement_level target ---
     BEHAVIORAL_FEATURES: ClassVar[list[str]] = [
-        "app_usage_time_min", "swipe_right_ratio", "message_sent_count",
-        "likes_received", "emoji_usage_rate",
+        "app_usage_time_min",
+        "swipe_right_ratio",
+        "message_sent_count",
+        "likes_received",
+        "emoji_usage_rate",
     ]
 
     def __init__(self) -> None:
@@ -51,30 +66,36 @@ class FeatureStore:
     def _register_defaults(self) -> None:
         """Register all known raw and engineered features."""
         for col in self.RAW_NUMERIC:
-            self.register(FeatureDefinition(
-                name=col,
-                description=f"Raw numeric column: {col}",
-                dtype="float64",
-                source_column=col,
-            ))
+            self.register(
+                FeatureDefinition(
+                    name=col,
+                    description=f"Raw numeric column: {col}",
+                    dtype="float64",
+                    source_column=col,
+                )
+            )
 
         for col in self.RAW_CATEGORICAL:
-            self.register(FeatureDefinition(
-                name=col,
-                description=f"Raw categorical column: {col}",
-                dtype="object",
-                source_column=col,
-            ))
+            self.register(
+                FeatureDefinition(
+                    name=col,
+                    description=f"Raw categorical column: {col}",
+                    dtype="object",
+                    source_column=col,
+                )
+            )
 
         # Target
-        self.register(FeatureDefinition(
-            name="engagement_level",
-            description="3-class engagement level (Low/Medium/High) from composite behavioral score",
-            dtype="int64",
-            source_column="behavioral_composite",
-            transformation="zscore_sum_quantile",
-            is_engineered=True,
-        ))
+        self.register(
+            FeatureDefinition(
+                name="engagement_level",
+                description="3-class engagement level (Low/Medium/High) from composite behavioral score",
+                dtype="int64",
+                source_column="behavioral_composite",
+                transformation="zscore_sum_quantile",
+                is_engineered=True,
+            )
+        )
 
         # Engineered features
         engineered = [
@@ -135,9 +156,7 @@ class FeatureStore:
 
     @property
     def engineered_names(self) -> list[str]:
-        return [
-            name for name, feat in self._features.items() if feat.is_engineered
-        ]
+        return [name for name, feat in self._features.items() if feat.is_engineered]
 
     def to_dict(self) -> list[dict]:
         return [

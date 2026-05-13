@@ -10,18 +10,20 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
 from app.services.model_service import ModelService
 
 try:
     from logging_config import logger
 except ImportError:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
     logger = logging.getLogger("intentsight")
 
 try:
     from performance_tracker import PerformanceTracker  # type: ignore[no-redef]
+
     _tracker = PerformanceTracker()
 except Exception:
     _tracker = None  # type: ignore[assignment]
@@ -104,8 +106,14 @@ class DataService:
 
         # Construct engagement_level target (same logic as preprocess.py)
         from sklearn.preprocessing import StandardScaler as _SS
-        behav_cols = ["app_usage_time_min", "swipe_right_ratio", "message_sent_count",
-                      "likes_received", "emoji_usage_rate"]
+
+        behav_cols = [
+            "app_usage_time_min",
+            "swipe_right_ratio",
+            "message_sent_count",
+            "likes_received",
+            "emoji_usage_rate",
+        ]
         behav_available = [c for c in behav_cols if c in raw.columns]
         if behav_available:
             scaled = _SS().fit_transform(raw[behav_available])
@@ -158,14 +166,24 @@ class DataService:
                 engineered["mutual_matches"] + 1
             )
         if {"weight_kg", "height_cm"}.issubset(engineered.columns):
-            engineered["bmi"] = engineered["weight_kg"] / ((engineered["height_cm"] / 100) ** 2)
+            engineered["bmi"] = engineered["weight_kg"] / (
+                (engineered["height_cm"] / 100) ** 2
+            )
         return engineered
 
     def _available_numeric_metrics(
         self, frame: pd.DataFrame | None = None
     ) -> dict[str, dict[str, Any]]:
-        source = frame if frame is not None else self._add_engineered_fields(self.raw_frame())
-        return {key: value for key, value in NUMERIC_METRICS.items() if key in source.columns}
+        source = (
+            frame
+            if frame is not None
+            else self._add_engineered_fields(self.raw_frame())
+        )
+        return {
+            key: value
+            for key, value in NUMERIC_METRICS.items()
+            if key in source.columns
+        }
 
     @staticmethod
     def _add_band(frame: pd.DataFrame, metric: str) -> None:
@@ -180,7 +198,8 @@ class DataService:
     def options(self) -> dict[str, Any]:
         numeric_metrics = self._available_numeric_metrics()
         categories = {
-            key: value for key, value in CATEGORY_FIELDS.items()
+            key: value
+            for key, value in CATEGORY_FIELDS.items()
             if key in self.raw_frame().columns
         }
         return {
@@ -189,8 +208,7 @@ class DataService:
                 for key, value in numeric_metrics.items()
             ],
             "categories": [
-                {"value": key, "label": value}
-                for key, value in categories.items()
+                {"value": key, "label": value} for key, value in categories.items()
             ],
         }
 
@@ -203,8 +221,7 @@ class DataService:
         frame = self.dashboard_frame()
         available_metrics = self._available_numeric_metrics(frame)
         available_categories = {
-            key: value for key, value in CATEGORY_FIELDS.items()
-            if key in frame.columns
+            key: value for key, value in CATEGORY_FIELDS.items() if key in frame.columns
         }
 
         if metric not in available_metrics:
@@ -235,7 +252,9 @@ class DataService:
                 + individual[band].astype(str)
             )
             top = individual["cohort"].value_counts().head(12).index
-            grouped = self._summarize(individual[individual["cohort"].isin(top)], ["cohort"])
+            grouped = self._summarize(
+                individual[individual["cohort"].isin(top)], ["cohort"]
+            )
             grouped["x"] = grouped["cohort"]
             grouped["series"] = "Top cohorts"
 
@@ -249,8 +268,16 @@ class DataService:
             "metric_label": available_metrics[metric]["label"],
             "category": category,
             "points": grouped[
-                ["x", "series", "count", "high_count", "medium_count", "low_count",
-                 "high_share", "avg_confidence"]
+                [
+                    "x",
+                    "series",
+                    "count",
+                    "high_count",
+                    "medium_count",
+                    "low_count",
+                    "high_share",
+                    "avg_confidence",
+                ]
             ].to_dict(orient="records"),
         }
 
@@ -271,7 +298,9 @@ class DataService:
         grouped["avg_confidence"] = grouped["avg_confidence"].fillna(0).round(4)
         return grouped
 
-    def heatmap(self, x: str = "gender", y: str = "app_usage_time_min") -> dict[str, Any]:
+    def heatmap(
+        self, x: str = "gender", y: str = "app_usage_time_min"
+    ) -> dict[str, Any]:
         frame = self.dashboard_frame()
         available_metrics = self._available_numeric_metrics(frame)
         x_column = self._resolve_heatmap_column(x, frame)
@@ -290,25 +319,40 @@ class DataService:
                     & (grouped[x_column].astype(str) == col)
                 ]
                 if match.empty:
-                    cells.append({
-                        "row": row, "column": col,
-                        "count": 0, "high_share": 0, "avg_confidence": 0,
-                    })
+                    cells.append(
+                        {
+                            "row": row,
+                            "column": col,
+                            "count": 0,
+                            "high_share": 0,
+                            "avg_confidence": 0,
+                        }
+                    )
                 else:
                     record = match.iloc[0]
-                    cells.append({
-                        "row": row, "column": col,
-                        "count": int(record["count"]),
-                        "high_share": float(record["high_share"]),
-                        "avg_confidence": float(record["avg_confidence"]),
-                    })
+                    cells.append(
+                        {
+                            "row": row,
+                            "column": col,
+                            "count": int(record["count"]),
+                            "high_share": float(record["high_share"]),
+                            "avg_confidence": float(record["avg_confidence"]),
+                        }
+                    )
 
         return {
-            "x": x, "y": y,
-            "x_label": CATEGORY_FIELDS.get(x, available_metrics.get(x, {}).get("label", x)),
-            "y_label": CATEGORY_FIELDS.get(y, available_metrics.get(y, {}).get("label", y)),
-            "rows": rows, "columns": cols,
-            "max_count": max_count, "cells": cells,
+            "x": x,
+            "y": y,
+            "x_label": CATEGORY_FIELDS.get(
+                x, available_metrics.get(x, {}).get("label", x)
+            ),
+            "y_label": CATEGORY_FIELDS.get(
+                y, available_metrics.get(y, {}).get("label", y)
+            ),
+            "rows": rows,
+            "columns": cols,
+            "max_count": max_count,
+            "cells": cells,
         }
 
     def _resolve_heatmap_column(
