@@ -101,11 +101,22 @@ class DataService:
     def dashboard_frame(self) -> pd.DataFrame:
         raw = self.raw_frame()
         raw = self._add_engineered_fields(raw)
-        raw["intent_bin"] = raw["relationship_intent"].apply(
-            lambda x: "Dating" if x in ["Serious Relationship", "Casual Dating"] else "Other"
-        )
 
-        y_encoded = LabelEncoder().fit_transform(raw["intent_bin"])
+        # Construct engagement_level target (same logic as preprocess.py)
+        from sklearn.preprocessing import StandardScaler as _SS
+        behav_cols = ["app_usage_time_min", "swipe_right_ratio", "message_sent_count",
+                      "likes_received", "emoji_usage_rate"]
+        behav_available = [c for c in behav_cols if c in raw.columns]
+        if behav_available:
+            scaled = _SS().fit_transform(raw[behav_available])
+            raw["engagement_score"] = scaled.sum(axis=1)
+            raw["engagement_level"] = pd.qcut(
+                raw["engagement_score"], q=3, labels=[0, 1, 2]
+            ).astype(int)
+        else:
+            raw["engagement_level"] = 1  # fallback: Medium
+
+        y_encoded = raw["engagement_level"].values
         _, test_index = train_test_split(
             raw.index.to_numpy(),
             test_size=0.2,
@@ -129,8 +140,9 @@ class DataService:
 
     def _fallback_predictions(self, frame: pd.DataFrame) -> pd.DataFrame:
         fallback = frame.copy()
-        fallback["prediction_label"] = fallback["intent_bin"]
-        fallback["prediction_encoded"] = fallback["intent_bin"].map({"Dating": 0, "Other": 1})
+        level_map = {0: "Low", 1: "Medium", 2: "High"}
+        fallback["prediction_label"] = fallback["engagement_level"].map(level_map)
+        fallback["prediction_encoded"] = fallback["engagement_level"]
         fallback["confidence"] = np.nan
         return fallback
 
@@ -147,14 +159,6 @@ class DataService:
             )
         if {"weight_kg", "height_cm"}.issubset(engineered.columns):
             engineered["bmi"] = engineered["weight_kg"] / ((engineered["height_cm"] / 100) ** 2)
-        if {"app_usage_time_min", "swipe_right_ratio", "emoji_usage_rate"}.issubset(
-            engineered.columns
-        ):
-            engineered["engagement_score"] = (
-                engineered["app_usage_time_min"]
-                * engineered["swipe_right_ratio"]
-                * engineered["emoji_usage_rate"]
-            )
         return engineered
 
     def _available_numeric_metrics(
@@ -245,8 +249,8 @@ class DataService:
             "metric_label": available_metrics[metric]["label"],
             "category": category,
             "points": grouped[
-                ["x", "series", "count", "dating_count", "other_count",
-                 "dating_share", "avg_confidence"]
+                ["x", "series", "count", "high_count", "medium_count", "low_count",
+                 "high_share", "avg_confidence"]
             ].to_dict(orient="records"),
         }
 
@@ -256,13 +260,14 @@ class DataService:
             frame.groupby(columns, observed=True)
             .agg(
                 count=("prediction_label", "size"),
-                dating_count=("prediction_label", lambda s: int((s == "Dating").sum())),
-                other_count=("prediction_label", lambda s: int((s == "Other").sum())),
+                high_count=("prediction_label", lambda s: int((s == "High").sum())),
+                medium_count=("prediction_label", lambda s: int((s == "Medium").sum())),
+                low_count=("prediction_label", lambda s: int((s == "Low").sum())),
                 avg_confidence=("confidence", "mean"),
             )
             .reset_index()
         )
-        grouped["dating_share"] = (grouped["dating_count"] / grouped["count"]).round(4)
+        grouped["high_share"] = (grouped["high_count"] / grouped["count"]).round(4)
         grouped["avg_confidence"] = grouped["avg_confidence"].fillna(0).round(4)
         return grouped
 
@@ -287,14 +292,14 @@ class DataService:
                 if match.empty:
                     cells.append({
                         "row": row, "column": col,
-                        "count": 0, "dating_share": 0, "avg_confidence": 0,
+                        "count": 0, "high_share": 0, "avg_confidence": 0,
                     })
                 else:
                     record = match.iloc[0]
                     cells.append({
                         "row": row, "column": col,
                         "count": int(record["count"]),
-                        "dating_share": float(record["dating_share"]),
+                        "high_share": float(record["high_share"]),
                         "avg_confidence": float(record["avg_confidence"]),
                     })
 

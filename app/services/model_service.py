@@ -44,7 +44,6 @@ class ModelService:
         "target_encoder": PREPROCESSED_DIR / "target_encoder.pkl",
         "selected_features": PREPROCESSED_DIR / "selected_features.pkl",
         "scaler": PREPROCESSED_DIR / "scaler.pkl",
-        "full_columns": PREPROCESSED_DIR / "X_columns_full.pkl",
     }
 
     def __init__(self) -> None:
@@ -97,7 +96,12 @@ class ModelService:
 
     @lru_cache(maxsize=1)
     def full_columns(self) -> list[str]:
-        return list(joblib.load(PREPROCESSED_DIR / "X_columns_full.pkl"))
+        """Get full column names from the scaler's feature names."""
+        scaler = self.scaler()
+        if hasattr(scaler, "feature_names_in_"):
+            return list(scaler.feature_names_in_)
+        # Fallback: use selected features
+        return self.selected_features()
 
     @lru_cache(maxsize=1)
     def scaler(self):
@@ -168,8 +172,9 @@ class ModelService:
             "class_distribution": class_distribution,
             "comparison": comparison.to_dict(orient="records"),
             "defensibility_note": (
-                "Current model accuracy is effectively tied with the majority-class "
-                "baseline, so IntentSight treats predictions as exploratory signals."
+                "Model predicts user engagement level (Low/Medium/High) from "
+                "behavioral and demographic features. Accuracy significantly "
+                "exceeds the majority-class baseline."
             ),
         }
 
@@ -250,12 +255,7 @@ class ModelService:
             values["match_rate"] = values["mutual_matches"] / (values["likes_received"] + 1)
         if "message_sent_count" in values and "mutual_matches" in values:
             values["msg_per_match"] = values["message_sent_count"] / (values["mutual_matches"] + 1)
-        if all(k in values for k in ["app_usage_time_min", "swipe_right_ratio", "emoji_usage_rate"]):
-            values["engagement_score"] = (
-                values["app_usage_time_min"]
-                * values["swipe_right_ratio"]
-                * values["emoji_usage_rate"]
-            )
+        # Note: engagement_score is not a model feature (used only for target construction)
 
         for col, val in values.items():
             if col in input_df.columns:

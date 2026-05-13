@@ -21,6 +21,9 @@ class FeatureDefinition:
 class FeatureStore:
     """Registry of all features used in the IntentSight pipeline."""
 
+    # --- Target ---
+    TARGET: ClassVar[str] = "engagement_level"
+
     # --- Raw columns from the behaviour dataset ---
     RAW_NUMERIC: ClassVar[list[str]] = [
         "age", "app_usage_time_min", "likes_received",
@@ -32,7 +35,13 @@ class FeatureStore:
     RAW_CATEGORICAL: ClassVar[list[str]] = [
         "gender", "income_bracket", "education_level",
         "sexual_orientation", "location_type", "swipe_time_of_day",
-        "body_type", "interest_tags", "relationship_intent",
+        "body_type", "interest_tags",
+    ]
+
+    # --- Behavioral features used to construct engagement_level target ---
+    BEHAVIORAL_FEATURES: ClassVar[list[str]] = [
+        "app_usage_time_min", "swipe_right_ratio", "message_sent_count",
+        "likes_received", "emoji_usage_rate",
     ]
 
     def __init__(self) -> None:
@@ -57,8 +66,26 @@ class FeatureStore:
                 source_column=col,
             ))
 
+        # Target
+        self.register(FeatureDefinition(
+            name="engagement_level",
+            description="3-class engagement level (Low/Medium/High) from composite behavioral score",
+            dtype="int64",
+            source_column="behavioral_composite",
+            transformation="zscore_sum_quantile",
+            is_engineered=True,
+        ))
+
         # Engineered features
         engineered = [
+            FeatureDefinition(
+                name="engagement_score",
+                description="Standardized sum of 5 behavioral features (before binning)",
+                dtype="float64",
+                source_column="behavioral",
+                transformation="zscore_sum",
+                is_engineered=True,
+            ),
             FeatureDefinition(
                 name="match_rate",
                 description="mutual_matches / (likes_received + 1)",
@@ -81,14 +108,6 @@ class FeatureStore:
                 dtype="float64",
                 source_column="weight_kg",
                 transformation="formula",
-                is_engineered=True,
-            ),
-            FeatureDefinition(
-                name="engagement_score",
-                description="app_usage_time_min * swipe_right_ratio * emoji_usage_rate",
-                dtype="float64",
-                source_column="app_usage_time_min",
-                transformation="product",
                 is_engineered=True,
             ),
             FeatureDefinition(

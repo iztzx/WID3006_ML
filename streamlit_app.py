@@ -64,7 +64,7 @@ def load_stacking_model():
 @st.cache_resource
 def load_artifacts():
     artifacts = {}
-    for name in ["target_encoder", "scaler", "selected_features", "X_columns_full"]:
+    for name in ["target_encoder", "scaler", "selected_features"]:
         pkl_path = PREPROCESSED_DIR / f"{name}.pkl"
         if pkl_path.exists():
             artifacts[name] = joblib.load(pkl_path)
@@ -122,7 +122,7 @@ def load_predictions_log():
 
 @st.cache_data
 def load_feature_importance():
-    csv_path = PREPROCESSED_DIR / "selected_features_unbiased.csv"
+    csv_path = RESULTS_DIR / "final_comparison.csv"
     if csv_path.exists():
         return pd.read_csv(csv_path)
     return None
@@ -338,7 +338,7 @@ def page_scenario_predictor():
     if model is None:
         st.error(
             "Model artifacts not found in `ML_Results/`. "
-            "Run `Machine_Learning_V2.py` first."
+            "Run `train.py` first."
         )
         return
 
@@ -350,18 +350,12 @@ def page_scenario_predictor():
     scaler = artifacts["scaler"]
     selected_features = artifacts["selected_features"]
 
-    # Also need full columns for constructing the input vector
-    full_columns = artifacts.get("X_columns_full")
-    if full_columns is None:
-        # Fallback: try to derive from X_train
-        x_train_path = PREPROCESSED_DIR / "X_train_selected_unresampled.csv"
-        if x_train_path.exists():
-            full_columns = list(pd.read_csv(x_train_path, nrows=0).columns)
-        else:
-            st.error("Cannot determine feature columns.")
-            return
+    # Derive full columns from scaler or selected features
+    scaler_obj = artifacts["scaler"]
+    if hasattr(scaler_obj, "feature_names_in_"):
+        full_columns = list(scaler_obj.feature_names_in_)
     else:
-        full_columns = list(full_columns)
+        full_columns = list(artifacts["selected_features"])
 
     # Input form
     col_left, col_right = st.columns(2)
