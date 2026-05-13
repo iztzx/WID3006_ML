@@ -253,7 +253,7 @@ def test_batch_invalid_field_handled_gracefully():
 def test_data_service_can_use_normal_dataset_without_bmi(monkeypatch, tmp_path):
     dataset_path = tmp_path / "Behaviour_Dataset.csv"
     rows = []
-    for index in range(10):
+    for index in range(30):
         rows.append(
             {
                 "gender": "Female" if index % 2 else "Male",

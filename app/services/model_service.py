@@ -286,14 +286,16 @@ class ModelService:
             proba = model.predict_proba(selected)
             confidence = float(np.max(proba, axis=1)[0])
             calibrated_proba = {
-                self.target_encoder().inverse_transform([i])[0]: round(float(p), 4)
+                str(self.target_encoder().inverse_transform([i])[0]): round(float(p), 4)
                 for i, p in enumerate(proba[0])
             }
 
         result = {
-            "prediction": label,
-            "encoded": int(encoded[0]),
-            "confidence": round(confidence, 4) if confidence is not None else None,
+            "prediction": str(label),
+            "encoded": int(encoded[0].item()),
+            "confidence": round(float(confidence), 4)
+            if confidence is not None
+            else None,
             "calibrated_probabilities": calibrated_proba,
             "ood_flags": ood_flags if ood_flags else None,
             "note": (
