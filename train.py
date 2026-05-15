@@ -1,9 +1,9 @@
 # =============================================================================
-# ML TRAINING — Engagement Level Pipeline
+# ML TRAINING - Connection Readiness Pipeline
 # WID3006 ML Group Assignment: "Tying the (Data) Knot"
 # =============================================================================
 # 6 models, 5-fold CV, RandomizedSearchCV on top 3, SHAP interpretability,
-# calibrated best model. Target: 3-class engagement level.
+# calibrated best model. Target: five-stage connection readiness.
 # =============================================================================
 
 import logging
@@ -179,7 +179,12 @@ print(base_results_df.to_string(index=False))
 # =============================================================================
 logger.info("STEP 3: Tuning top 3 models with RandomizedSearchCV...")
 
-top3_names = base_results_df.head(3)["Model"].tolist()
+top3_names = (
+    pd.DataFrame(base_results)
+    .sort_values("CV Accuracy (mean)", ascending=False)
+    .head(3)["Model"]
+    .tolist()
+)
 logger.info("  Top 3: %s", top3_names)
 
 param_distributions = {
@@ -274,17 +279,30 @@ logger.info("STEP 4: Selecting best model and calibrating...")
 all_candidates = []
 for r in base_results:
     all_candidates.append(
-        {"name": r["Model"], "test_acc": r["Test Accuracy"], "source": "base"}
+        {
+            "name": r["Model"],
+            "selection_score": r["CV Accuracy (mean)"],
+            "test_acc": r["Test Accuracy"],
+            "source": "base",
+        }
     )
 for name, r in tuned_results.items():
-    all_candidates.append({"name": name, "test_acc": r["test_acc"], "source": "tuned"})
+    all_candidates.append(
+        {
+            "name": name,
+            "selection_score": r["cv_score"],
+            "test_acc": r["test_acc"],
+            "source": "tuned",
+        }
+    )
 
-best_candidate = max(all_candidates, key=lambda x: x["test_acc"])
+best_candidate = max(all_candidates, key=lambda x: x["selection_score"])
 best_name = best_candidate["name"]
 logger.info(
-    "  Best: %s (%s) — Test Acc: %.4f",
+    "  Best: %s (%s) selected by CV %.4f | Test Acc: %.4f",
     best_name,
     best_candidate["source"],
+    best_candidate["selection_score"],
     best_candidate["test_acc"],
 )
 
@@ -308,7 +326,7 @@ y_proba_cal = calibrated_pipeline.predict_proba(X_test)
 cal_acc = accuracy_score(y_test, y_pred_cal)
 cal_f1 = f1_score(y_test, y_pred_cal, average="weighted")
 
-logger.info("  Calibrated — Accuracy: %.4f, F1: %.4f", cal_acc, cal_f1)
+logger.info("  Calibrated - Accuracy: %.4f, F1: %.4f", cal_acc, cal_f1)
 
 # Reliability diagram (for first class)
 fraction_of_positives, mean_predicted_value = calibration_curve(
@@ -319,7 +337,7 @@ plt.plot([0, 1], [0, 1], "--", color="gray", label="Perfectly calibrated")
 plt.plot(mean_predicted_value, fraction_of_positives, "s-", label=best_name)
 plt.xlabel("Mean Predicted Probability")
 plt.ylabel("Fraction of Positives")
-plt.title(f"Calibration Plot — {best_name}")
+plt.title(f"Calibration Plot - {best_name}")
 plt.legend()
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
@@ -531,6 +549,6 @@ for artifact in sorted(OUTPUT_PATH.iterdir()):
 # =============================================================================
 logger.info("=" * 60)
 logger.info(
-    "ML Pipeline Complete! Best: %s (calibrated) — Acc: %.4f", best_name, cal_acc
+    "ML Pipeline Complete! Best: %s (calibrated) - Acc: %.4f", best_name, cal_acc
 )
 logger.info("=" * 60)

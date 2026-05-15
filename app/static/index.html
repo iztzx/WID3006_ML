@@ -12,7 +12,7 @@
     <main class="shell" id="main-content" role="main">
       <header class="topbar" role="banner">
         <div>
-          <p class="eyebrow">Intent signal explorer</p>
+          <p class="eyebrow">Connection readiness explorer</p>
           <h1>IntentSight</h1>
         </div>
         <div class="view-toggle" role="tablist" aria-label="Dashboard view">
@@ -36,7 +36,7 @@
         <article class="metric-tile" aria-label="Weighted F1 score">
           <span>Weighted F1</span>
           <strong id="weightedF1">--</strong>
-          <small>Exploratory signal quality</small>
+          <small>Product signal quality</small>
         </article>
         <article class="metric-tile" aria-label="Test set size">
           <span>Test rows</span>
@@ -91,7 +91,7 @@
           <article class="panel heat-panel">
             <div class="panel-head">
               <div>
-                <p class="eyebrow">Prediction density</p>
+                <p class="eyebrow">Connection density</p>
                 <h2 id="heatmapTitle">Behavior heat map</h2>
               </div>
             </div>
@@ -112,7 +112,7 @@
             <div class="panel-head">
               <div>
                 <p class="eyebrow">Exploratory scenario</p>
-                <h2>Single profile signal</h2>
+                <h2>Single profile stage</h2>
               </div>
             </div>
             <form id="scenarioForm" class="scenario-form" aria-label="Scenario prediction form">
@@ -149,7 +149,7 @@
               <label for="inpActive">Last active hour</label>
               <input id="inpActive" name="last_active_hour" type="number" min="0" max="23" value="12" />
 
-              <button type="submit">Run signal</button>
+              <button type="submit">Predict stage</button>
             </form>
             <div id="predictionResult" class="prediction-result" role="alert" aria-live="polite">Awaiting scenario.</div>
           </article>

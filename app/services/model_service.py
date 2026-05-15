@@ -14,6 +14,8 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from connection_scoring import add_connection_features
+
 try:
     from logging_config import logger
 except ImportError:
@@ -179,9 +181,10 @@ class ModelService:
             "class_distribution": class_distribution,
             "comparison": comparison.to_dict(orient="records"),
             "defensibility_note": (
-                "Model predicts user engagement level (Low/Medium/High) from "
-                "behavioral and demographic features. Accuracy significantly "
-                "exceeds the majority-class baseline."
+                "Model predicts a connection-readiness stage from match efficiency, "
+                "conversation depth, profile completeness, swipe balance, and "
+                "activity signals. The labels are product-oriented weak labels, "
+                "not claims about private user intent."
             ),
         }
 
@@ -255,22 +258,14 @@ class ModelService:
 
         values = dict(payload)
 
-        # Compute derived features
-        if "height_cm" in values and "weight_kg" in values and values["height_cm"] > 0:
-            values["bmi"] = values["weight_kg"] / ((values["height_cm"] / 100) ** 2)
-        if "mutual_matches" in values and "likes_received" in values:
-            values["match_rate"] = values["mutual_matches"] / (
-                values["likes_received"] + 1
-            )
-        if "message_sent_count" in values and "mutual_matches" in values:
-            values["msg_per_match"] = values["message_sent_count"] / (
-                values["mutual_matches"] + 1
-            )
-        # Note: engagement_score is not a model feature (used only for target construction)
-
         for col, val in values.items():
             if col in input_df.columns:
                 input_df.at[0, col] = val
+
+        engineered = add_connection_features(input_df)
+        for col in full_columns:
+            if col in engineered.columns:
+                input_df[col] = engineered[col]
 
         # Scale first, then run OOD detection on scaled features
         scaled = pd.DataFrame(self.scaler().transform(input_df), columns=full_columns)
@@ -299,8 +294,8 @@ class ModelService:
             "calibrated_probabilities": calibrated_proba,
             "ood_flags": ood_flags if ood_flags else None,
             "note": (
-                "Exploratory scenario prediction. Fields not supplied default to zero, "
-                "so interaction features may be incorrect if constituent values are missing."
+                "Exploratory connection-readiness prediction. Fields not supplied "
+                "default to zero, so interaction features may be incomplete."
             ),
         }
 

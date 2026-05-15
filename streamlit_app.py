@@ -1,6 +1,6 @@
-"""IntentSight — Streamlit Dashboard (Tier 1 Deployment).
+"""IntentSight - Streamlit Dashboard (Tier 1 Deployment).
 
-Interactive data product for exploring user-intent predictions,
+Interactive data product for exploring connection-readiness predictions,
 model performance, feature importance, and scenario simulation.
 """
 
@@ -16,6 +16,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from connection_scoring import add_connection_features
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -27,7 +29,7 @@ RESULTS_DIR = ROOT / "ML_Results"
 # Page config
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="IntentSight — User Intent Explorer",
+    page_title="IntentSight - Connection Readiness Explorer",
     page_icon=":bar_chart:",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -127,7 +129,7 @@ def load_feature_importance():
 # ---------------------------------------------------------------------------
 
 st.sidebar.title("IntentSight")
-st.sidebar.markdown("**User Intent Signal Explorer**")
+st.sidebar.markdown("**Connection Readiness Explorer**")
 page = st.sidebar.radio(
     "Navigate",
     [
@@ -149,12 +151,11 @@ st.sidebar.markdown('WID3006 ML Group Assignment  \n"Tying the (Data) Knot"')
 
 
 def page_overview():
-    st.title("IntentSight — Overview")
+    st.title("IntentSight - Overview")
     st.markdown(
-        "Exploratory data product for classifying user intent from "
+        "Exploratory data product for classifying connection readiness from "
         "dating-app behaviour data.  \n"
-        "Predictions are **exploratory signals**, not ground truth — "
-        "model accuracy is comparable to the majority-class baseline."
+        "Predictions are **product signals**, not claims about private intent."
     )
 
     comparison = load_comparison()
@@ -326,8 +327,8 @@ def page_feature_importance():
 def page_scenario_predictor():
     st.title("Scenario Predictor")
     st.markdown(
-        "Simulate a user profile and see the predicted intent.  \n"
-        "Predictions are exploratory — fields left at default may "
+        "Simulate a user profile and see the predicted connection stage.  \n"
+        "Predictions are exploratory - fields left at default may "
         "produce unreliable interaction features."
     )
 
@@ -375,7 +376,7 @@ def page_scenario_predictor():
         profile_pics = st.slider("Profile Pictures", 0, 50, 3)
         last_active = st.slider("Last Active Hour", 0, 23, 12)
 
-    if st.button("Predict Intent", type="primary", use_container_width=True):
+    if st.button("Predict Stage", type="primary", use_container_width=True):
         # Build input vector
         input_df = pd.DataFrame(np.zeros((1, len(full_columns))), columns=full_columns)
 
@@ -393,16 +394,14 @@ def page_scenario_predictor():
             "last_active_hour": last_active,
         }
 
-        # Derived features
-        if height_cm > 0:
-            values["bmi"] = weight_kg / ((height_cm / 100) ** 2)
-        values["match_rate"] = mutual_matches / (likes_received + 1)
-        values["msg_per_match"] = msg_sent / (mutual_matches + 1)
-        values["engagement_score"] = app_usage * swipe_ratio * emoji_rate
-
         for col, val in values.items():
             if col in input_df.columns:
                 input_df.at[0, col] = val
+
+        engineered = add_connection_features(input_df)
+        for col in full_columns:
+            if col in engineered.columns:
+                input_df[col] = engineered[col]
 
         # Scale and select
         scaled = pd.DataFrame(scaler.transform(input_df), columns=full_columns)
@@ -414,10 +413,10 @@ def page_scenario_predictor():
 
         # Display result
         st.markdown("---")
-        if label == "Dating":
-            st.success(f"**Predicted Intent: {label}**")
+        if label == "Likely To Connect":
+            st.success(f"**Predicted Stage: {label}**")
         else:
-            st.info(f"**Predicted Intent: {label}**")
+            st.info(f"**Predicted Stage: {label}**")
 
         # Probabilities
         if hasattr(model, "predict_proba"):
@@ -536,7 +535,7 @@ def page_data_explorer():
 
     # Cohort analysis
     if "relationship_intent" in raw.columns:
-        st.subheader("Intent Distribution")
+        st.subheader("Relationship Intent Distribution")
         intent_counts = raw["relationship_intent"].value_counts().reset_index()
         intent_counts.columns = ["Intent", "Count"]
         fig = px.bar(intent_counts, x="Intent", y="Count", color="Intent")

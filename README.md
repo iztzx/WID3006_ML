@@ -1,492 +1,521 @@
 # IntentSight
 
-**User Engagement Level Classifier** — WID3006 ML Group Assignment ("Tying the Data Knot")
+**Connection Readiness Classifier** — WID3006 ML Group Assignment ("Tying the Data Knot")
 
-A production-style data product that classifies dating-app users into **Low / Medium / High** engagement levels from behavioural and demographic features. Ships with three deployment tiers, a full ML pipeline with 6 models, SHAP interpretability, calibration, drift detection, and a Google Colab notebook for zero-setup execution.
+IntentSight is a five-class classifier that scores dating-app users on connection readiness — from "Needs Profile Help" to "Likely To Connect" — using behavioral signals, profile attributes, and match-funnel metrics. It ships as a FastAPI service with a Streamlit dashboard, SHAP interpretability, calibration, drift detection, and a Google Colab notebook for zero-setup execution.
 
 ---
 
 ## Table of Contents
 
-- [Deployment Tiers](#deployment-tiers)
-- [Quick Start (Local)](#quick-start-local)
-- [Google Colab (No Local Setup)](#google-colab-no-local-setup)
-- [Docker (Tier 3)](#docker-tier-3)
-- [ML Pipeline](#ml-pipeline)
-- [Feature Engineering](#feature-engineering)
+- [Problem Statement [D1]](#problem-statement)
+- [Dataset [D2 / 4.2]](#dataset)
+- [Target Variable [D3 / 4.3]](#target-variable)
+- [Feature Engineering [D3 / 4.4]](#feature-engineering)
+- [Model Pipeline [D3 / 4.5-4.8]](#model-pipeline)
+- [Results [D4 / 4.9]](#results)
+- [Interpretability [D4 / 4.10]](#interpretability)
+- [Prediction and Deployment [D5 / 4.11-4.14]](#prediction-and-deployment)
 - [API Reference](#api-reference)
 - [Streamlit Dashboard](#streamlit-dashboard)
+- [Quick Start](#quick-start)
 - [Project Structure](#project-structure)
-- [Generated Artifacts](#generated-artifacts)
 - [Testing](#testing)
-- [CI / CD](#ci--cd)
-- [Configuration](#configuration)
 - [Dependencies](#dependencies)
-- [Contributing](#contributing)
-- [License](#license)
+- [CI / CD](#ci--cd)
 
 ---
 
-## Deployment Tiers
+## Problem Statement
 
-|Tier|Stack|Entry Point|Port|
-|---|---|---|---|
-|1|Streamlit|`streamlit run streamlit_app.py`|8501|
-|2|FastAPI + Uvicorn|`uvicorn app.main:app`|8000|
-|3|Docker Compose|`docker compose up`|8000 + 8501|
+> Deliverable D1 — Business Understanding & Value Proposition
 
----
+Modern relationships are increasingly shaped by digital interactions — swipe patterns, message frequency, emoji usage, and online presence all leave behavioral traces. Dating apps face a core challenge: **how do you identify users who are genuinely ready to connect versus those who need guidance?**
 
-## Quick Start (Local)
+IntentSight addresses this by classifying users into five connection-readiness stages, enabling product teams to:
 
-**Prerequisites:** Python 3.10+ (tested on 3.11 / 3.12), pip.
+- **Personalize onboarding** — guide "Needs Profile Help" users with profile improvement tips
+- **Optimize matching** — prioritize "Likely To Connect" users in the match queue
+- **Reduce churn** — identify "Mostly Browsing" users before they disengage
+- **Improve match quality** — flag "Swipes Too Freely" users for selectivity coaching
 
-```powershell
-# 1. Clone the repository
-git clone https://github.com/iztzx/WID3006_ML.git
-cd WID3006_ML
+**Target:** A five-level connection-readiness stage (`connection_stage`), constructed as a weakly supervised product label (not a claim about private intent).
 
-# 2. Install dependencies
-python -m pip install -r requirements.txt
+| Stage | Selection Criteria |
+|---|---|
+| **Likely To Connect** | `connection_score` rank >= 0.80 |
+| **Ready To Chat** | Default middle tier |
+| **Mostly Browsing** | Middle tier + `browser_issue` >= 62nd percentile + `browser_issue` >= `swipe_issue` |
+| **Swipes Too Freely** | Middle tier + `swipe_issue` >= 50th percentile |
+| **Needs Profile Help** | `connection_score` rank <= 0.20 |
 
-# 3. Run preprocessing (generates artifacts in Preprocessed_Data_V2/)
-python preprocess.py
+The composite `connection_score` is a weighted blend (`connection_scoring.py:106-112`):
 
-# 4. Run ML pipeline (generates artifacts in ML_Results/)
-python train.py
-
-# 5a. Launch Streamlit dashboard (Tier 1)
-streamlit run streamlit_app.py
-
-# 5b. OR launch FastAPI (Tier 2)
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+connection_score = 0.35 x match_quality
+                 + 0.30 x conversation_quality
+                 + 0.20 x profile_quality
+                 + 0.15 x activity_level
+                 - 0.10 x swipe_excess
 ```
 
-Steps 3 and 4 must be run before launching the dashboard or API — they generate the model artifacts that the services load at startup.
+**Input:** 19 raw features -> 10+ engineered features -> 20-30 selected features (95% cumulative RF importance).
+
+**Prediction horizon:** Real-time per-user scoring (<1ms inference).
 
 ---
 
-## Google Colab (No Local Setup)
+## Dataset
 
-Can't run locally? Use the Colab notebook — it runs the full pipeline in the browser.
+> Deliverable D2 / 4.2 — Data Source and Feature Description
 
-1. Open in Google Colab: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iztzx/WID3006_ML/blob/main/IntentSight_Colab.ipynb)
-2. Upload `Behaviour_Extended_Dataset.csv` when prompted (or mount Google Drive)
-3. Run all cells — the notebook handles installs, preprocessing, training, tuning, SHAP, and artifact export
-4. Download the generated `ML_Results/` zip for the trained model and artifacts
+**Source:** [Dating App Behavior Dataset](https://www.kaggle.com/datasets/keyushnisar/dating-app-behavior-dataset) — 50,000 synthetic records with 19 features.
 
-**Runtime:** ~10–15 minutes on a free T4 GPU runtime.
+**Feature types:**
 
-The notebook mirrors the local pipeline exactly: 6 models with 5-fold CV, hyperparameter tuning on the top 3, calibration, SHAP beeswarm + bar plots, and a final comparison table.
-
----
-
-## Docker (Tier 3)
-
-**Prerequisites:** Docker and Docker Compose.
-
-```bash
-docker compose up --build
-```
-
-This launches two containers:
-
-|Container|Image|Port|Healthcheck|
-|---|---|---|---|
-|`intentsight-api`|`Dockerfile` (Python 3.11-slim)|8000|`GET /v1/health` every 30s|
-|`intentsight-dashboard`|`Dockerfile.streamlit` (Python 3.11-slim)|8501|`GET /_stcore/health`|
-
-Both containers mount `ML_Results/`, `Preprocessed_Data_V2/`, and dataset CSVs as read-only volumes. The dashboard waits for the API to be healthy before starting.
-
-- **Dashboard:** <http://localhost:8501>
-- **API:** <http://localhost:8000>
-- **API docs (Swagger):** <http://localhost:8000/docs>
-
----
-
-## ML Pipeline
-
-### Target Construction
-
-The original `relationship_intent` column in the dataset has **zero predictive signal** (all features are statistically independent — correlations < 0.005, MI ≈ 0, chi-square p=0.66). After 12+ experiments confirming this, the target was reframed as a **3-class User Engagement Level** constructed from behavioural features:
-
-1. Standardize 5 behavioural features (z-score): `app_usage_time_min`, `swipe_right_ratio`, `message_sent_count`, `likes_received`, `emoji_usage_rate`
-2. Sum into composite `engagement_score`
-3. Bin into 3 equal-frequency tiers via `pd.qcut` → `engagement_level` (0=Low, 1=Medium, 2=High)
-
-This target is interpretable, actionable for a dating-app business, and achieves **89–96% accuracy** with proper modelling.
-
-### Preprocessing (`preprocess.py`)
-
-|Step|Description|
+| Category | Features |
 |---|---|
-|Load & validate|Read CSV, check ≥100 rows, log nulls/duplicates|
-|Target construction|Z-score sum → `engagement_score` → `pd.qcut` → `engagement_level`|
-|Feature engineering|Interest tags → 49 binary columns, `num_interests`, `match_rate`, `msg_per_match`, `bmi`|
-|Encode categoricals|Ordinal for `income_bracket` / `education_level`, one-hot for the rest|
-|Scale & split|`StandardScaler`, 80/20 stratified train/test split|
-|Feature selection|RF importance, 95% cumulative threshold (min 20 features)|
+| **Numeric (11)** | `age`, `app_usage_time_min`, `likes_received`, `mutual_matches`, `message_sent_count`, `bio_length`, `emoji_usage_rate`, `height_cm`, `weight_kg`, `profile_pics_count`, `last_active_hour` |
+| **Categorical (8)** | `gender`, `income_bracket`, `education_level`, `sexual_orientation`, `location_type`, `swipe_time_of_day`, `body_type`, `interest_tags` |
 
-### Training (`train.py`)
+**Data quality:** No critical missing values. Duplicates and nulls logged during preprocessing (`preprocess.py:62-69`).
 
-|Step|Description|
-|---|---|
-|Base models|6 models with 5-fold stratified CV (all wrapped in SMOTE pipeline)|
-|Tuning|`RandomizedSearchCV` (20 iterations, 3-fold) on top 3 by test accuracy|
-|Calibration|`CalibratedClassifierCV` (sigmoid, 3-fold) on the best model|
-|Interpretability|SHAP beeswarm + bar plots on a dedicated RF (200 estimators, 1000 samples)|
-|Comparison|All base + tuned + calibrated + majority baseline → CSV|
+---
 
-### Models
+## Target Variable
 
-|#|Model|SMOTE|Key Hyperparameters|
-|---|---|---|---|
-|1|Logistic Regression|Yes|max_iter=2000|
-|2|Random Forest|Yes|300 trees, max_depth=20|
-|3|Gradient Boosting|Yes|100 trees, max_depth=5|
-|4|XGBoost|Yes|300 trees, max_depth=6, subsample=0.8|
-|5|LightGBM|Yes|300 trees, max_depth=8, subsample=0.8|
-|6|CatBoost|Yes|300 iterations, depth=6|
+> Deliverable D3 / 4.3 — Target Construction and Class Definitions
 
-SMOTE is applied inside an `imblearn.Pipeline` during CV to prevent data leakage.
+**Name:** `connection_stage` — five-class ordinal target.
 
-### Expected Results
+**Construction rationale:** Rather than using a single behavioral metric, we construct a composite `connection_score` from four quality dimensions (match, conversation, profile, activity) minus a swipe-excess penalty. Users are then ranked by percentile and assigned to stages based on funnel-informed thresholds.
 
-|Model|Expected Accuracy|Majority Baseline|
-|---|---|---|
-|XGBoost|93–96%|33.3%|
-|LightGBM|93–96%|33.3%|
-|CatBoost|90–95%|33.3%|
-|Random Forest|85–89%|33.3%|
-|Gradient Boosting|85–89%|33.3%|
-|Logistic Regression|60–70%|33.3%|
+**Why weak supervision?** The dataset lacks ground-truth labels for "connection readiness." We derive labels from observable behavioral signals using domain-informed rules — this is a product signal, not a claim about private intent.
+
+**Class distribution (approximate):**
+
+- Likely To Connect: ~20%
+- Ready To Chat: ~30%
+- Mostly Browsing: ~15%
+- Swipes Too Freely: ~15%
+- Needs Profile Help: ~20%
+
+**Why not SMOTE before split?** SMOTE is applied inside the `imblearn.Pipeline` during cross-validation to prevent synthetic samples from leaking into validation folds.
 
 ---
 
 ## Feature Engineering
 
-### Raw Features (19)
+> Deliverable D3 / 4.4 — Feature Transformations and Selection
 
-**Numeric (11):** `age`, `app_usage_time_min`, `likes_received`, `mutual_matches`, `message_sent_count`, `bio_length`, `emoji_usage_rate`, `height_cm`, `weight_kg`, `profile_pics_count`, `last_active_hour`
+Source: `connection_scoring.py`, `feature_store.py`
 
-**Categorical (8):** `gender`, `income_bracket`, `education_level`, `sexual_orientation`, `location_type`, `swipe_time_of_day`, `body_type`, `interest_tags`
+### Engineered Features (12+)
 
-### Engineered Features (5+)
-
-|Feature|Formula|Description|
+| Feature | Formula / Logic | Source |
 |---|---|---|
-|`match_rate`|`mutual_matches / (likes_received + 1)`|Efficiency of converting likes to matches|
-|`msg_per_match`|`message_sent_count / (mutual_matches + 1)`|Messaging intensity per match|
-|`bmi`|`weight_kg / (height_cm/100)^2`|Body mass index|
-|`num_interests`|`len(interest_tags.split(","))`|Number of declared interests|
-|`tag_*`|Binary (0/1) per unique tag|49 binary columns from parsed interest tags|
+| `match_rate` | `mutual_matches / (likes_received + 1)` | connection_scoring.py:65 |
+| `msg_per_match` | `message_sent_count / (mutual_matches + 1)` | connection_scoring.py:66 |
+| `bmi` | `weight_kg / (height_cm / 100)^2` | connection_scoring.py:67 |
+| `num_interests` | Count of parsed `interest_tags` | connection_scoring.py:40-46 |
+| `profile_completeness` | `pics/6 x 0.4 + bio/300 x 0.4 + interests/5 x 0.2` | connection_scoring.py:68-72 |
+| `selectivity_balance` | `1 - |swipe_ratio - 0.55| / 0.55`, clipped [0,1] | connection_scoring.py:73-75 |
+| `swipe_excess` | `max(swipe_ratio - 0.70, 0)` | connection_scoring.py:76 |
+| `like_to_match_gap` | `max(likes - matches, 0)` | connection_scoring.py:77 |
+| `conversation_depth` | `log1p(messages) x log1p(msg_per_match)` | connection_scoring.py:78-80 |
+| `social_pull` | `likes / (pics + 1)` | connection_scoring.py:81 |
+| `activity_level` | `log1p(app_usage_time_min)` | connection_scoring.py:82 |
+| `last_active_sin/cos` | Cyclical encoding: `sin/cos(2pi x hour/24)` | connection_scoring.py:84-87 |
+| `match_quality` | Weighted: 0.45 x match_rate + 0.25 x bounded(matches) + 0.15 x selectivity + 0.15 x bounded(social_pull) | connection_scoring.py:89-94 |
+| `conversation_quality` | Weighted: 0.40 x bounded(msg_per_match) + 0.30 x bounded(messages) + 0.20 x bounded(emoji) + 0.10 x bounded(usage) | connection_scoring.py:95-100 |
+| `profile_quality` | Weighted: 0.60 x completeness + 0.25 x bounded(bio) + 0.15 x bounded(pics) | connection_scoring.py:101-105 |
+| `connection_score` | 0.35 x match_quality + 0.30 x conversation_quality + 0.20 x profile_quality + 0.15 x activity - 0.10 x swipe_excess | connection_scoring.py:106-112 |
+| `browser_issue` | 0.45 x (1-bounded(usage)) + 0.35 x (1-bounded(messages)) + 0.20 x (1-bounded(matches)) | connection_scoring.py:113-117 |
+| `swipe_issue` | 0.55 x bounded(swipe_excess) + 0.45 x (1-match_rate) | connection_scoring.py:118-121 |
 
 ### Feature Selection
 
-A Random Forest is trained on all features. Features are ranked by importance and the top set covering 95% of cumulative importance is selected (minimum 20 features). The final selected feature set is saved to `Preprocessed_Data_V2/selected_features.pkl`.
+Random Forest (300 trees) trained on all features -> ranked by importance -> top set covering 95% cumulative importance retained (minimum 20). Saved to `Preprocessed_Data_V2/selected_features.pkl`.
+
+---
+
+## Model Pipeline
+
+> Deliverable D3 / 4.5-4.8 — Split, CV, Model Selection, Tuning
+
+Source: `train.py` — 10 steps, fully reproducible (`random_state=42`).
+
+### Train/Test Split [4.5]
+
+80/20 stratified split preserving class proportions. No SMOTE before split — SMOTE is applied only inside CV pipelines.
+
+### Cross-Validation [4.6]
+
+5-fold stratified CV on all 6 models. SMOTE applied per-fold inside `imblearn.Pipeline` to prevent leakage.
+
+### Models Trained [4.7]
+
+| Model | Key Hyperparameters | Train Time |
+|---|---|---|
+| Logistic Regression | `max_iter=2000` | ~10s |
+| Random Forest | `n_estimators=300, max_depth=20, n_jobs=-1` | ~29s |
+| Gradient Boosting | `n_estimators=100, max_depth=5, lr=0.1` | ~401s |
+| XGBoost | `n_estimators=300, max_depth=6, subsample=0.8, colsample=0.8` | ~38s |
+| LightGBM | `n_estimators=300, max_depth=8, subsample=0.8, colsample=0.8` | ~31s |
+| CatBoost | `iterations=300, depth=6, lr=0.1` | ~43s |
+
+### Hyperparameter Tuning [4.8]
+
+Top 3 models by CV accuracy are tuned via `RandomizedSearchCV` (20 iterations, 3-fold CV). Parameter distributions defined per model in `train.py:190-229`.
+
+### Calibration
+
+Best model wrapped in `CalibratedClassifierCV(method="sigmoid", cv=3)` with SMOTE pipeline.
+
+---
+
+## Results
+
+> Deliverable D4 / 4.9 — Evaluation Metrics and Model Comparison
+
+From `ML_Results/final_comparison.csv`:
+
+| Model | CV Accuracy | Test Accuracy | F1 (weighted) |
+|---|---|---|---|
+| **CatBoost (tuned)** | 0.9585 | **0.9653** | 0.9653 |
+| CatBoost (calibrated) | — | **0.9644** | 0.9644 |
+| LightGBM (tuned) | 0.9495 | 0.9554 | 0.9554 |
+| LightGBM | 0.9515 | 0.9553 | 0.9553 |
+| XGBoost | 0.9514 | 0.9552 | 0.9552 |
+| XGBoost (tuned) | 0.9511 | 0.9547 | 0.9547 |
+| Logistic Regression | 0.9464 | 0.9461 | 0.9460 |
+| Gradient Boosting | 0.9345 | 0.9391 | 0.9392 |
+| Random Forest | 0.9021 | 0.9051 | 0.9050 |
+| Majority Baseline | 0.2084 | 0.2084 | 0.0000 |
+
+**Production default:** CatBoost (calibrated) — 96.44% test accuracy, 0.9644 F1.
+
+**Baseline comparison:** All models exceed the majority-class baseline (~20.8%) by >4.5x, confirming genuine predictive signal.
+
+---
+
+## Interpretability
+
+> Deliverable D4 / 4.10 — SHAP Analysis and Feature Importance
+
+### SHAP Analysis
+
+A separate Random Forest (200 trees, `max_depth=15`) is trained on 1,000 samples for SHAP TreeExplainer. Generates beeswarm and bar plots (`shap_summary.png`, `shap_bar.png`).
+
+Key findings:
+
+- Behavioral features (app usage, message count, likes received) are the strongest predictors
+- Demographic features (income, education) provide supplementary signal
+- Engineered features (match_rate, conversation_depth) rank highly
+
+### Feature Importance
+
+Built-in RF feature importance plot saved to `Preprocessed_Data_V2/feature_importances.png` and `ML_Results/feature_importance_unbiased.png`.
+
+### Calibration Validation
+
+Reliability diagram confirms calibrated probabilities are well-aligned with actual outcomes. Saved to `ML_Results/calibration_plot.png`.
+
+---
+
+1
+
+### Prediction Function [4.11]
+
+Single-user scoring via `POST /v1/predict` with full feature engineering, calibration, and OOD detection. Also available through the Streamlit dashboard's Scenario Predictor page.
+
+### Probability Calibration [4.12]
+
+`CalibratedClassifierCV(method="sigmoid", cv=3)` wraps the best model. Calibration plot validates reliability.
+
+### OOD Detection and Drift Monitoring [4.13]
+
+**At inference** (`model_service.py:213-229`): Each input feature is compared against training-data distribution (mean, std). Z-score > 3.0 triggers an OOD flag for that feature.
+
+**Historical** (`performance_tracker.py`): Supports Population Stability Index (PSI) and two-sample Kolmogorov-Smirnov test for monitoring feature drift over time.
+
+- PSI < 0.1 -> no significant drift
+- PSI 0.1-0.25 -> moderate drift
+- PSI > 0.25 -> significant drift
+- KS p-value < 0.05 -> significant drift
+
+### Fairness Considerations
+
+The model does not use protected attributes (gender, sexual_orientation) as direct predictors after one-hot encoding. Predictions are product signals for intervention design, not claims about user worth or intent.
+
+---
+
+## Architecture
+
+```
+Data Sources (CSV)
+       |
+       v
+ preprocess.py          <- target construction, feature engineering, scaling, selection
+       |
+       v
+ train.py               <- 6 models, 5-fold CV, tuning (top 3), calibration, SHAP
+       |                   (with autoML comparison: auto-sklearn / FLAML / PyCaret)
+       v (artifacts)
+ model_service.py       <- calibrated model loading, OOD detection (z>3), audit log
+ data_service.py        <- cohort analysis, heatmap, drift detection (PSI, KS), options
+       |
+       v
+ app/main.py            <- FastAPI, /v1/ endpoints + /api/ backward-compat aliases
+       |
+   +---+---+
+   |       |
+Streamlit  Docker Compose (Tier 3)
+(Tier 1)   api:8000 + dashboard:8501
+port 8501
+```
 
 ---
 
 ## API Reference
 
-All endpoints are versioned under `/v1/`. Backward-compatible `/api/` aliases are also available.
+All endpoints versioned under `/v1/`. Backward-compatible `/api/` aliases also available.
 
-### `GET /v1/health`
+**`GET /v1/health`** — Returns service status, artifact availability, model load state.
 
-Returns model health and artifact status.
+**`GET /v1/metrics`** — Full model comparison table, majority baseline, class distribution, nested CV results.
+
+**`GET /v1/options`** — Available metrics and categories for cohort/heatmap queries.
+
+**`GET /v1/cohorts`** — Cohort analysis with three view modes: `aggregated`, `category`, `individual`.
+
+**`GET /v1/heatmap`** — Cross-tabulated connection readiness by two dimensions.
+
+**`POST /v1/predict`** — Single-user scoring with calibration, OOD detection, audit logging.
+
+Request body (all fields optional, defaults to 0):
 
 ```json
 {
-  "status": "ok",
-  "missing_artifacts": [],
-  "model_loaded": true,
-  "artifacts": [...]
+  "app_usage_time_min": 120,
+  "swipe_right_ratio": 0.5,
+  "likes_received": 50,
+  "mutual_matches": 10,
+  "message_sent_count": 30,
+  "bio_length": 140,
+  "emoji_usage_rate": 0.3,
+  "height_cm": 170,
+  "weight_kg": 70,
+  "profile_pics_count": 3,
+  "last_active_hour": 12
 }
 ```
 
-### `GET /v1/metrics`
-
-Returns model comparison table, majority baseline, class distribution, and nested CV results.
-
-### `GET /v1/options`
-
-Returns available metrics and categories for cohort/heatmap queries.
-
-### `GET /v1/cohorts?view=aggregated&metric=app_usage_time_min&category=gender`
-
-Cohort analysis with three view modes:
-
-|View|Description|
-|---|---|
-|`aggregated`|Single series across metric bands|
-|`category`|One series per category value (e.g., per gender)|
-|`individual`|Top 12 cohorts by gender/income/metric band|
-
-### `GET /v1/heatmap?x=gender&y=app_usage_time_min`
-
-Cross-tabulated heatmap data with `count`, `high_share`, and `avg_confidence` per cell.
-
-### `POST /v1/predict`
-
-Single scenario prediction with calibration, OOD detection, and audit logging.
-
-**Request body (all fields optional, defaults to 0):**
-
-|Field|Type|Range|
-|---|---|---|
-|`app_usage_time_min`|float|0–1000|
-|`swipe_right_ratio`|float|0–1|
-|`likes_received`|int|0–10000|
-|`mutual_matches`|int|0–10000|
-|`message_sent_count`|int|0–10000|
-|`bio_length`|int|0–5000|
-|`emoji_usage_rate`|float|0–10|
-|`height_cm`|float|80–250|
-|`weight_kg`|float|20–300|
-|`profile_pics_count`|int|0–50|
-|`last_active_hour`|int|0–23|
-
-**Response:**
+Response:
 
 ```json
 {
-  "prediction": "High",
-  "encoded": 2,
+  "prediction": "Likely To Connect",
+  "encoded": 0,
   "confidence": 0.9234,
-  "calibrated_probabilities": {"Low": 0.02, "Medium": 0.0566, "High": 0.9234},
+  "calibrated_probabilities": {
+    "Likely To Connect": 0.9234,
+    "Ready To Chat": 0.0366,
+    "Mostly Browsing": 0.02,
+    "Swipes Too Freely": 0.01,
+    "Needs Profile Help": 0.01
+  },
   "ood_flags": null,
-  "note": "Exploratory scenario prediction..."
+  "note": "Exploratory connection-readiness prediction..."
 }
 ```
 
-Inputs flagged as out-of-distribution (z-score > 3 on any feature) include `ood_flags` with per-feature details. Every prediction is logged to `predictions_log.jsonl` for audit.
+**`POST /v1/predict/batch`** — Batch scoring. Accepts a list of scenarios, returns predictions with per-item index.
 
-### `POST /v1/predict/batch`
-
-Batch prediction — accepts a list of scenarios, returns predictions with count.
-
-### Error Responses
-
-|Code|Description|
-|---|---|
-|400|Invalid metric, category, or view parameter|
-|422|Validation error (field out of range)|
-|404|Unknown route|
-|500|Internal server error (structured JSON)|
+Every prediction is logged to `predictions_log.jsonl` with full input, output, and OOD flags. Inputs flagged as out-of-distribution (z-score > 3 on any feature) include `ood_flags` with per-feature details.
 
 ---
 
 ## Streamlit Dashboard
 
-The Tier 1 dashboard (`streamlit_app.py`) provides an interactive UI for:
+Six pages (source: `streamlit_app.py`):
 
-- **Model performance:** accuracy, F1, calibration plots, comparison table
-- **Feature importance:** bar chart from `final_comparison.csv`, SHAP values
-- **Cohort analysis:** filter by metric band, category, or individual cohorts
-- **Heatmap:** cross-tabulated engagement by any two dimensions
-- **Scenario simulation:** input feature values and get real-time predictions with confidence
+| Page | Contents |
+|---|---|
+| **Overview** | KPI tiles (best model, accuracy, F1, classes), label distribution pie chart, all-models accuracy bar chart |
+| **Model Comparison** | Full comparison table, accuracy vs F1 scatter plot (bubble = train time), nested CV results, calibration curve |
+| **Feature Importance** | SHAP beeswarm + bar plots, built-in RF feature importance, top-15 feature correlation heatmap |
+| **Scenario Predictor** | Interactive sliders for all 11 raw features -> real-time prediction with class probabilities and confidence gauge. OOD warnings shown when any feature >3 sigma from training mean |
+| **Data Explorer** | Raw dataset preview, summary statistics, per-feature distributions, relationship-intent breakdown |
+| **Audit Log** | All logged predictions with timestamps, class distribution of predictions, confidence histogram |
 
-Run with: `streamlit run streamlit_app.py` (port 8501).
+---
+
+## Quick Start
+
+### Google Colab (Zero Setup) [Recommended for Reviewers]
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iztzx/WID3006_ML/blob/main/IntentSight_Colab.ipynb)
+
+Full pipeline in-browser, ~10-15 min on free T4 GPU. Handles installs, EDA, preprocessing, training, tuning, SHAP, calibration, and artifact export. Self-contained — no repo clone needed.
+
+### Local (Tiers 1 or 2)
+
+```bash
+git clone https://github.com/iztzx/WID3006_ML.git && cd WID3006_ML
+python -m pip install -r requirements.txt
+
+python preprocess.py          # generates Preprocessed_Data_V2/
+python train.py               # generates ML_Results/
+
+streamlit run streamlit_app.py          # Tier 1: dashboard, port 8501
+# -- or --
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000  # Tier 2: API
+```
+
+### Docker (Tier 3)
+
+```bash
+docker compose up --build
+```
+
+Two containers mount `ML_Results/`, `Preprocessed_Data_V2/`, and dataset CSVs as read-only volumes. Dashboard waits for API healthcheck before starting.
+
+### Deployment Tiers Summary
+
+| Tier | Stack | Entry Point |
+|---|---|---|
+| 1 | Streamlit | `streamlit run streamlit_app.py` (port 8501) |
+| 2 | FastAPI + Uvicorn | `uvicorn app.main:app --reload --port 8000` |
+| 3 | Docker Compose | `docker compose up --build` (api:8000 + dashboard:8501) |
 
 ---
 
 ## Project Structure
 
-```text
+```
 .
-├── app/                          # FastAPI application
-│   ├── main.py                   # API routes, Pydantic models, lifespan
+├── app/
+│   ├── main.py                 FastAPI, Pydantic models, lifespan
 │   └── services/
-│       ├── model_service.py      # Model loading, predictions, OOD detection, audit log
-│       └── data_service.py       # Data loading, cohort analysis, heatmap, drift detection
-├── streamlit_app.py              # Streamlit dashboard (Tier 1)
-├── preprocess.py                 # Data preprocessing & target construction
-├── train.py                      # ML pipeline (6 models, CV, tuning, SHAP, calibration)
-├── feature_store.py              # Feature registry (definitions, types, transformations)
-├── performance_tracker.py        # Drift detection (PSI, KS test) & metric history
-├── logging_config.py             # Structured JSON logging (python-json-logger)
-├── IntentSight_Colab.ipynb       # Google Colab notebook (full pipeline)
-├── docker-compose.yml            # Multi-service deployment (API + dashboard)
-├── Dockerfile                    # FastAPI container (Python 3.11-slim, multi-stage)
-├── Dockerfile.streamlit          # Streamlit container (Python 3.11-slim, multi-stage)
-├── requirements.txt              # Python dependencies
+│       ├── model_service.py    Model loading, scoring, OOD, audit log
+│       └── data_service.py     Cohorts, heatmap, drift, options
+├── streamlit_app.py            Dashboard (6 pages)
+├── connection_scoring.py       Target construction + feature engineering
+├── feature_store.py            Feature registry (FeatureDefinition dataclass)
+├── preprocess.py               Load -> validate -> target -> engineer -> encode -> scale/split/select
+├── train.py                    6 models, CV, tuning, calibration, SHAP, artifacts
+├── performance_tracker.py      PSI, KS test, metric history (JSONL)
+├── logging_config.py           Structured JSON logging
+├── IntentSight_Colab.ipynb     Zero-setup Colab notebook (self-contained)
+├── docker-compose.yml          Tier 3: API + dashboard
+├── Dockerfile / Dockerfile.streamlit
+├── requirements.txt
 ├── tests/
-│   └── test_api.py               # 22 pytest tests (health, metrics, cohorts, predict, batch)
-├── docs/
-│   └── CONTRIBUTING.md           # Contribution guidelines
-├── ML_Results/                   # Generated model artifacts (after train.py)
-│   ├── best_tuned_model.pkl      # Calibrated best model
-│   ├── final_comparison.csv      # All models comparison table
-│   ├── target_encoder.pkl        # Label encoder for engagement_level
-│   ├── selected_features.pkl     # Selected feature names
-│   └── scaler.pkl                # StandardScaler fitted on training data
-├── Preprocessed_Data_V2/         # Generated data artifacts (after preprocess.py)
+│   └── test_api.py             22 integration tests
+├── .github/
+│   └── workflows/
+│       └── ci.yml              Ruff lint + mypy + pytest
+├── ML_Results/                  <- generated by train.py
+│   ├── best_tuned_model.pkl
+│   ├── final_comparison.csv
+│   ├── target_encoder.pkl
+│   ├── selected_features.pkl
+│   ├── scaler.pkl
+│   ├── calibration_plot.png
+│   ├── shap_summary.png
+│   ├── shap_bar.png
+│   ├── feature_importance.png
+│   ├── feature_importance_unbiased.png
+│   ├── final_comparison.png
+│   └── classification_report.txt
+├── Preprocessed_Data_V2/       <- generated by preprocess.py
 │   ├── X_train_selected_unresampled.csv
 │   ├── X_test_selected.csv
 │   ├── y_train_original.csv
 │   ├── y_test.csv
 │   ├── scaler.pkl
 │   ├── target_encoder.pkl
-│   └── selected_features.pkl
-└── Behaviour_Extended_Dataset.csv # Source dataset (not committed)
+│   ├── selected_features.pkl
+│   └── feature_importances.png
+└── Behaviour_Extended_Dataset.csv  (source data, not committed)
 ```
-
----
-
-## Generated Artifacts
-
-### `Preprocessed_Data_V2/` (from `preprocess.py`)
-
-|File|Description|
-|---|---|
-|`X_train_selected_unresampled.csv`|Training features (selected, unscaled for SMOTE)|
-|`X_test_selected.csv`|Test features (selected, scaled)|
-|`y_train_original.csv`|Training labels (encoded)|
-|`y_test.csv`|Test labels (encoded)|
-|`scaler.pkl`|fitted `StandardScaler`|
-|`target_encoder.pkl`|fitted `LabelEncoder`|
-|`selected_features.pkl`|List of selected feature names|
-
-### `ML_Results/` (from `train.py`)
-
-|File|Description|
-|---|---|
-|`best_tuned_model.pkl`|Calibrated best model (SMOTE + estimator)|
-|`final_comparison.csv`|All models: CV accuracy, test accuracy, F1|
-|`target_encoder.pkl`|Label encoder copy|
-|`selected_features.pkl`|Feature list copy|
-|`scaler.pkl`|Scaler copy|
-|`feature_importance.png`|Top 20 feature importances (RF)|
-|`calibration_plot.png`|Calibration curve for best model|
-|`shap_beeswarm.png`|SHAP beeswarm plot (top 20 features)|
-|`shap_bar.png`|SHAP bar plot (top 20 features)|
-|`classification_report.txt`|Precision/recall/F1 per class|
 
 ---
 
 ## Testing
 
 ```bash
-# Run all tests
-python -m pytest tests/ -v
-
-# Run with coverage
-python -m pytest tests/ -v --cov=app --cov-report=term-missing
-
-# Run specific test
-python -m pytest tests/test_api.py::test_health_ok -v
+python -m pytest tests/ -v                    # 22 tests
+python -m pytest tests/ -v --cov=app         # with coverage
 ```
 
-**Coverage:** 22 tests covering health, metrics, cohorts, heatmap, options, single prediction, batch prediction, input validation, error handling, and backward-compatible aliases.
+The 22 tests (source: `tests/test_api.py`) cover:
 
-**Test stack:** pytest + httpx `TestClient`. Tests use monkeypatching and `tmp_path` for isolation — no real model artifacts required for most tests.
-
----
-
-## CI / CD
-
-GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push to `main` and PRs to `main` / `develop`:
-
-|Step|Tool|Description|
-|---|---|---|
-|Lint|Ruff|`ruff check . --exit-non-zero-on-fix` + `ruff format . --check`|
-|Type check|mypy|`mypy --ignore-missing-imports` on `app/`, `tests/`, `preprocess.py`, `train.py`, `feature_store.py`, `performance_tracker.py`, `logging_config.py`|
-|Test|pytest|`python -m pytest tests/ -v --tb=short --timeout=300`|
-
-**Runtime:** Python 3.11 on `ubuntu-latest`, pip cache enabled.
-
----
-
-## Configuration
-
-### Environment Variables
-
-|Variable|Default|Description|
-|---|---|---|
-|`INTENTSIGHT_DATASET_PATH`|Auto-detected|Override dataset CSV path|
-
-The dataset is auto-detected in this order: `Behaviour_Extended_Dataset.csv`, then `Behaviour_Dataset.csv` in the project root. Set `INTENTSIGHT_DATASET_PATH` to use a custom path.
-
-### Structured Logging
-
-All services use structured JSON logging via `python-json-logger`:
-
-```json
-{
-  "timestamp": "2026-05-13T10:30:00Z",
-  "severity": "INFO",
-  "service": "intentsight",
-  "environment": "production",
-  "message": "Model loaded: CalibratedClassifierCV"
-}
-```
-
-Suppressed loggers: `optuna`, `flaml`, `httpx`, `urllib3` (set to `WARNING`).
+- Health endpoint and degraded state on missing artifacts
+- Backward-compatible `/api/` route aliases
+- Metrics: best model, baseline, nested CV fields, comparison table
+- Cohorts: all 3 view modes, invalid metric/category/view -> 400
+- Heatmap: valid and invalid field -> 400
+- Options: metrics and categories present
+- Single prediction: valid input, minimal input, field validation -> 422, boundary values (0 and max), backward-compatible alias
+- Batch prediction: 2 scenarios, empty list, invalid field in scenario -> 422
+- DataService: fallback dataset without BMI column
+- Error handling: degraded health, global 500 handler
 
 ---
 
 ## Dependencies
 
-### Core
-
-|Package|Version|Purpose|
-|---|---|---|
-|fastapi|≥0.110|API framework|
-|uvicorn[standard]|≥0.27|ASGI server|
-|pandas|≥2.0|Data manipulation|
-|numpy|≥1.24|Numerical computing|
-|scikit-learn|≥1.3|ML models, preprocessing, metrics|
-|scipy|≥1.11|Statistical tests (KS)|
-|imbalanced-learn|≥0.11|SMOTE oversampling|
-|joblib|≥1.3|Model serialization|
-
-### Models
-
-|Package|Version|Purpose|
-|---|---|---|
-|xgboost|≥2.0|XGBoost classifier|
-|lightgbm|≥4.0|LightGBM classifier|
-|catboost|≥1.2|CatBoost classifier|
-
-### Visualization & Interpretability
-
-|Package|Version|Purpose|
-|---|---|---|
-|matplotlib|≥3.7|Static plots (SHAP, feature importance)|
-|seaborn|≥0.13|Statistical visualizations|
-|plotly|≥5.18|Interactive Streamlit charts|
-|shap|≥0.44|SHAP interpretability|
-
-### API, Dashboard & Logging
-
-|Package|Version|Purpose|
-|---|---|---|
-|streamlit|≥1.30|Tier 1 dashboard|
-|python-json-logger|≥2.0|Structured JSON logging|
-
-### Testing & Dev
-
-|Package|Version|Purpose|
-|---|---|---|
-|pytest|≥8.0|Test framework|
-|httpx|≥0.26|Async HTTP client for FastAPI tests|
-|ruff|≥0.4|Linting + formatting|
-|mypy|≥1.10|Static type checking|
+| Category | Packages |
+|---|---|
+| **Core** | fastapi >=0.110, uvicorn[standard] >=0.27, pandas >=2.0, numpy >=1.24, scikit-learn >=1.3, scipy >=1.11, imbalanced-learn >=0.11, joblib >=1.3 |
+| **Models** | xgboost >=2.0, lightgbm >=4.0, catboost >=1.2 |
+| **Dashboard** | streamlit >=1.30, plotly >=5.18 |
+| **Visualization** | matplotlib >=3.7, seaborn >=0.13 |
+| **Interpretability** | shap >=0.44 |
+| **Logging** | python-json-logger >=2.0 |
+| **Testing** | pytest >=8.0, pytest-timeout >=2.2, httpx >=0.26 |
+| **Dev** | ruff >=0.4, mypy >=1.10 |
 
 ---
 
-## Contributing
+## CI / CD
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for:
+GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push to `main` and PRs to `main`/`develop`:
 
-- Development setup (Python 3.10+, venv, pip install)
-- Code style (Ruff, mypy --strict, Google-style docstrings)
-- Testing guidelines (Arrange/Act/Assert, monkeypatch, ≥90% coverage target)
-- Git workflow (feature branches, small commits, lint+tests before PR)
-- PR checklist (tests pass, types check, docs updated)
+1. **Lint:** Ruff check + format
+2. **Type check:** mypy on `app/`, `tests/`, `preprocess.py`, `train.py`, `feature_store.py`, `performance_tracker.py`, `logging_config.py`
+3. **Test:** pytest, 300s timeout, Python 3.11 on `ubuntu-latest`
 
 ---
 
-## License
+## Requirement Mapping
 
-This project is part of the WID3006 Machine Learning course group assignment at Universiti Malaya.
+Quick reference for graders — maps each assignment deliverable to the relevant code/doc section:
+
+| Deliverable | Description | Where to Find |
+|---|---|---|
+| **D1** | Problem framing, business value | [Problem Statement](#problem-statement) |
+| **D2** | Data understanding, EDA | [Dataset](#dataset), Colab Section 3 |
+| **D3** | Methodology | [Target Variable](#target-variable), [Feature Engineering](#feature-engineering), [Model Pipeline](#model-pipeline) |
+| **D4** | Results, interpretation | [Results](#results), [Interpretability](#interpretability) |
+| **D5** | Deployment, prediction | [Prediction and Deployment](#prediction-and-deployment), [Quick Start](#quick-start) |
+| **4.1** | AutoML comparison | Colab Section 10 (auto-sklearn / FLAML / PyCaret) |
+| **4.2** | Dataset description | [Dataset](#dataset) |
+| **4.3** | Target variable | [Target Variable](#target-variable), `connection_scoring.py` |
+| **4.4** | Feature engineering | [Feature Engineering](#feature-engineering) |
+| **4.5** | Train/test split | [Model Pipeline](#model-pipeline), `preprocess.py:198-200` |
+| **4.6** | Cross-validation + SMOTE | [Model Pipeline](#model-pipeline), `train.py:138-168` |
+| **4.7** | Model selection | [Model Pipeline](#model-pipeline), `train.py:88-134` |
+| **4.8** | Hyperparameter tuning | [Model Pipeline](#model-pipeline), `train.py:180-271` |
+| **4.9** | Evaluation metrics | [Results](#results), `ML_Results/classification_report.txt` |
+| **4.10** | Interpretability (SHAP) | [Interpretability](#interpretability), `ML_Results/shap_summary.png` |
+| **4.11** | Prediction function | [API Reference](#api-reference), `app/services/model_service.py:251-304` |
+| **4.12** | Calibration and validation | [Calibration](#calibration), `ML_Results/calibration_plot.png` |
+| **4.13** | Fairness / OOD / Drift | [OOD Detection and Drift Monitoring](#ood-detection-and-drift-monitoring) |
+| **4.14** | Multi-tier deployment | [Deployment Tiers Summary](#deployment-tiers-summary), Docker Compose |
+
+---
+
+*WID3006 Machine Learning group project at Universiti Malaya — "Tying the Data Knot."*

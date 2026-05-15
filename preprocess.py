@@ -1,9 +1,9 @@
 # =============================================================================
-# PREPROCESSING — Engagement Level Pipeline
+# PREPROCESSING - Connection Readiness Pipeline
 # WID3006 ML Group Assignment: "Tying the (Data) Knot"
 # =============================================================================
-# Constructs a 3-class "User Engagement Level" target from behavioral features,
-# engineers features, encodes, scales, and exports train/test artifacts.
+# Constructs a five-stage connection-readiness target from dating-app funnel
+# signals, engineers features, encodes, scales, and exports train/test artifacts.
 # =============================================================================
 
 import logging
@@ -23,6 +23,12 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
+from connection_scoring import (
+    TARGET_COL,
+    add_connection_features,
+    construct_connection_stage,
+)
+
 try:
     from logging_config import logger
 except ImportError:
@@ -38,16 +44,6 @@ ROOT = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT / "Preprocessed_Data_V2"
 DATASET_PATH = ROOT / "Behaviour_Extended_Dataset.csv"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-TARGET_COL = "engagement_level"
-BEHAVIORAL_FEATURES = [
-    "app_usage_time_min",
-    "swipe_right_ratio",
-    "message_sent_count",
-    "likes_received",
-    "emoji_usage_rate",
-]
-
 
 # =============================================================================
 # STEP 1: LOAD & VALIDATE
@@ -78,21 +74,13 @@ def validate_dataset(df: pd.DataFrame) -> None:
 # STEP 2: CONSTRUCT TARGET
 # =============================================================================
 def construct_target(df: pd.DataFrame) -> pd.DataFrame:
-    """Create 3-class engagement level from behavioral features.
+    """Create five plain-language connection-readiness labels."""
+    logger.info("Constructing %s target...", TARGET_COL)
 
-    Standardizes 5 behavioral features, sums them into a composite score,
-    then bins into 3 equal-frequency tiers: Low (0), Medium (1), High (2).
-    """
-    logger.info("Constructing engagement_level target...")
-
-    scaler_temp = StandardScaler()
-    behav_scaled = scaler_temp.fit_transform(df[BEHAVIORAL_FEATURES])
-    df["engagement_score"] = behav_scaled.sum(axis=1)
-
-    df[TARGET_COL] = pd.qcut(df["engagement_score"], q=3, labels=[0, 1, 2]).astype(int)
+    df[TARGET_COL] = construct_connection_stage(df)
 
     dist = df[TARGET_COL].value_counts().sort_index()
-    logger.info("  Engagement level distribution:\n%s", dist.to_dict())
+    logger.info("  Connection-stage distribution:\n%s", dist.to_dict())
     return df
 
 
@@ -103,7 +91,9 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Engineer new features and drop redundant columns."""
     logger.info("Engineering features...")
 
-    # Interest tags → binary columns
+    df = add_connection_features(df)
+
+    # Interest tags -> binary columns
     tags_series = df["interest_tags"].fillna("").str.split(r",\s*")
     all_tags = set()
     for tag_list in tags_series:
@@ -114,15 +104,6 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
 
     for tag in sorted_tags:
         df[f"tag_{tag}"] = tags_series.apply(lambda x: 1 if tag in x else 0)
-    df["num_interests"] = tags_series.apply(len)
-
-    # Ratio/interaction features
-    if {"mutual_matches", "likes_received"}.issubset(df.columns):
-        df["match_rate"] = df["mutual_matches"] / (df["likes_received"] + 1)
-    if {"message_sent_count", "mutual_matches"}.issubset(df.columns):
-        df["msg_per_match"] = df["message_sent_count"] / (df["mutual_matches"] + 1)
-    if {"weight_kg", "height_cm"}.issubset(df.columns):
-        df["bmi"] = df["weight_kg"] / ((df["height_cm"] / 100) ** 2)
 
     # Drop redundant columns
     cols_to_drop = [
@@ -131,10 +112,14 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
         "swipe_right_label",
         "relationship_intent",
         "match_outcome",
+        "connection_score",
+        "browser_issue",
+        "swipe_issue",
         "engagement_score",
     ]
+    dropped = [c for c in cols_to_drop if c in df.columns]
     df = df.drop(columns=[c for c in cols_to_drop if c in df.columns])
-    logger.info("  Dropped: %s", [c for c in cols_to_drop if c in df.columns])
+    logger.info("  Dropped: %s", dropped)
     return df
 
 
@@ -281,7 +266,7 @@ def scale_split_select(
 # =============================================================================
 def main() -> None:
     logger.info("=" * 60)
-    logger.info("PREPROCESSING — Engagement Level Pipeline")
+    logger.info("PREPROCESSING - Connection Readiness Pipeline")
     logger.info("=" * 60)
 
     # Step 1: Load & validate
@@ -309,10 +294,10 @@ def main() -> None:
 
     X_train.to_csv(OUTPUT_DIR / "X_train_selected_unresampled.csv", index=False)
     X_test.to_csv(OUTPUT_DIR / "X_test_selected.csv", index=False)
-    pd.DataFrame(y_train, columns=["engagement"]).to_csv(
+    pd.DataFrame(y_train, columns=[TARGET_COL]).to_csv(
         OUTPUT_DIR / "y_train_original.csv", index=False
     )
-    pd.DataFrame(y_test, columns=["engagement"]).to_csv(
+    pd.DataFrame(y_test, columns=[TARGET_COL]).to_csv(
         OUTPUT_DIR / "y_test.csv", index=False
     )
 

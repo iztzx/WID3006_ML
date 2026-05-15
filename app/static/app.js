@@ -1,5 +1,5 @@
 /**
- * IntentSight Dashboard JS — v3
+ * IntentSight Dashboard JS - v3
  *
  * Enhancements over v2:
  * - Loading skeletons / overlay
@@ -37,7 +37,7 @@ async function getJson(url, options = {}) {
     return response.json();
   } catch (err) {
     if (err.name === "TypeError") {
-      throw new Error("Network error — check the server is running.");
+      throw new Error("Network error - check the server is running.");
     }
     throw err;
   }
@@ -301,7 +301,7 @@ function renderLineChart(points) {
               series: name,
               cohort: point.x,
               count: point.count || 0,
-              datingShare: point.dating_share || 0,
+              strongShare: point.strong_share || point.high_share || 0,
               confidence: point.avg_confidence || 0,
             })
           );
@@ -328,7 +328,7 @@ function wireTooltips(container) {
     const show = (e) => {
       const detail = JSON.parse(decodeURIComponent(point.dataset.detail));
       tooltip.hidden = false;
-      tooltip.innerHTML = `<strong>${detail.series}</strong><br>${detail.cohort}<br>Volume: ${detail.count}<br>Dating share: ${pct(detail.datingShare)}<br>Avg confidence: ${pct(detail.confidence)}`;
+      tooltip.innerHTML = `<strong>${detail.series}</strong><br>${detail.cohort}<br>Volume: ${detail.count}<br>Strong-stage share: ${pct(detail.strongShare)}<br>Avg confidence: ${pct(detail.confidence)}`;
       const rect = container.getBoundingClientRect();
       tooltip.style.left = `${e.clientX - rect.left + 14}px`;
       tooltip.style.top = `${e.clientY - rect.top + 14}px`;
@@ -361,7 +361,7 @@ function renderHeatmap(data) {
         .map((column) => data.cells.find((cell) => cell.row === row && cell.column === column))
         .map((cell) => {
           const intensity = Math.max(0.05, (cell.count / maxCount) * 0.78).toFixed(2);
-          return `<div class="heat-cell" style="--intensity:${intensity}" role="cell" aria-label="${row} ${column}: ${cell.count} users, dating share ${pct(cell.dating_share)}">${cell.count}<small>${pct(cell.avg_confidence)}</small></div>`;
+          return `<div class="heat-cell" style="--intensity:${intensity}" role="cell" aria-label="${row} ${column}: ${cell.count} users, strong-stage share ${pct(cell.strong_share || cell.high_share)}">${cell.count}<small>${pct(cell.avg_confidence)}</small></div>`;
         })
         .join("");
       return `<div class="heat-row" style="--cols:${columns.length}"><div class="heat-label">${row}</div>${cells}</div>`;
@@ -431,7 +431,7 @@ function addActivityEntry(result) {
   const entry = document.createElement("div");
   entry.className = "activity-entry";
   entry.innerHTML = `<span class="pred">${result.prediction}</span>
-    <span class="time">${now} — confidence: ${result.confidence != null ? (result.confidence * 100).toFixed(1) + "%" : "N/A"}</span>`;
+    <span class="time">${now} - confidence: ${result.confidence != null ? (result.confidence * 100).toFixed(1) + "%" : "N/A"}</span>`;
 
   container.prepend(entry);
   $("logCount").textContent = `(${state.predictionCount})`;

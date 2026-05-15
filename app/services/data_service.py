@@ -12,6 +12,12 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from app.services.model_service import ModelService
+from connection_scoring import (
+    STRONG_STAGES,
+    TARGET_COL,
+    add_connection_features,
+    construct_connection_stage,
+)
 
 try:
     from logging_config import logger
@@ -103,28 +109,9 @@ class DataService:
     def dashboard_frame(self) -> pd.DataFrame:
         raw = self.raw_frame()
         raw = self._add_engineered_fields(raw)
+        raw[TARGET_COL] = construct_connection_stage(raw)
 
-        # Construct engagement_level target (same logic as preprocess.py)
-        from sklearn.preprocessing import StandardScaler as _SS
-
-        behav_cols = [
-            "app_usage_time_min",
-            "swipe_right_ratio",
-            "message_sent_count",
-            "likes_received",
-            "emoji_usage_rate",
-        ]
-        behav_available = [c for c in behav_cols if c in raw.columns]
-        if behav_available:
-            scaled = _SS().fit_transform(raw[behav_available])
-            raw["engagement_score"] = scaled.sum(axis=1)
-            raw["engagement_level"] = pd.qcut(
-                raw["engagement_score"], q=3, labels=[0, 1, 2]
-            ).astype(int)
-        else:
-            raw["engagement_level"] = 1  # fallback: Medium
-
-        y_encoded = raw["engagement_level"].values
+        y_encoded = raw[TARGET_COL].values
         _, test_index = train_test_split(
             raw.index.to_numpy(),
             test_size=0.2,
@@ -148,28 +135,17 @@ class DataService:
 
     def _fallback_predictions(self, frame: pd.DataFrame) -> pd.DataFrame:
         fallback = frame.copy()
-        level_map = {0: "Low", 1: "Medium", 2: "High"}
-        fallback["prediction_label"] = fallback["engagement_level"].map(level_map)
-        fallback["prediction_encoded"] = fallback["engagement_level"]
+        if TARGET_COL in fallback.columns:
+            fallback["prediction_label"] = fallback[TARGET_COL].astype(str)
+        else:
+            fallback["prediction_label"] = "Ready To Chat"
+        fallback["prediction_encoded"] = pd.factorize(fallback["prediction_label"])[0]
         fallback["confidence"] = np.nan
         return fallback
 
     @staticmethod
     def _add_engineered_fields(frame: pd.DataFrame) -> pd.DataFrame:
-        engineered = frame.copy()
-        if {"mutual_matches", "likes_received"}.issubset(engineered.columns):
-            engineered["match_rate"] = engineered["mutual_matches"] / (
-                engineered["likes_received"] + 1
-            )
-        if {"message_sent_count", "mutual_matches"}.issubset(engineered.columns):
-            engineered["msg_per_match"] = engineered["message_sent_count"] / (
-                engineered["mutual_matches"] + 1
-            )
-        if {"weight_kg", "height_cm"}.issubset(engineered.columns):
-            engineered["bmi"] = engineered["weight_kg"] / (
-                (engineered["height_cm"] / 100) ** 2
-            )
-        return engineered
+        return add_connection_features(frame)
 
     def _available_numeric_metrics(
         self, frame: pd.DataFrame | None = None
@@ -276,6 +252,8 @@ class DataService:
                     "medium_count",
                     "low_count",
                     "high_share",
+                    "strong_count",
+                    "strong_share",
                     "avg_confidence",
                 ]
             ].to_dict(orient="records"),
@@ -287,14 +265,27 @@ class DataService:
             frame.groupby(columns, observed=True)
             .agg(
                 count=("prediction_label", "size"),
-                high_count=("prediction_label", lambda s: int((s == "High").sum())),
-                medium_count=("prediction_label", lambda s: int((s == "Medium").sum())),
-                low_count=("prediction_label", lambda s: int((s == "Low").sum())),
+                high_count=(
+                    "prediction_label",
+                    lambda s: int(s.isin(STRONG_STAGES).sum()),
+                ),
+                medium_count=(
+                    "prediction_label",
+                    lambda s: int(
+                        s.isin({"Mostly Browsing", "Swipes Too Freely"}).sum()
+                    ),
+                ),
+                low_count=(
+                    "prediction_label",
+                    lambda s: int((s == "Needs Profile Help").sum()),
+                ),
                 avg_confidence=("confidence", "mean"),
             )
             .reset_index()
         )
         grouped["high_share"] = (grouped["high_count"] / grouped["count"]).round(4)
+        grouped["strong_share"] = grouped["high_share"]
+        grouped["strong_count"] = grouped["high_count"]
         grouped["avg_confidence"] = grouped["avg_confidence"].fillna(0).round(4)
         return grouped
 
@@ -325,6 +316,7 @@ class DataService:
                             "column": col,
                             "count": 0,
                             "high_share": 0,
+                            "strong_share": 0,
                             "avg_confidence": 0,
                         }
                     )
@@ -336,6 +328,9 @@ class DataService:
                             "column": col,
                             "count": int(record["count"]),
                             "high_share": float(record["high_share"]),
+                            "strong_share": float(
+                                record.get("strong_share", record["high_share"])
+                            ),
                             "avg_confidence": float(record["avg_confidence"]),
                         }
                     )

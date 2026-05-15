@@ -1,4 +1,4 @@
-# Predictive Modeling Dashboard Plan: "IntentSight"
+# Connection Readiness Dashboard Plan: "IntentSight"
 
 ## 1. Product Vision & Aesthetics
 The goal is to deliver a **high-fidelity, minimalist, visual-first UI** that transforms dense machine learning inferences into immediate, actionable insights. The design language utilizes a sleek dark-mode aesthetic with "glassmorphism" components to maintain data density without feeling cluttered. 
@@ -14,7 +14,7 @@ The goal is to deliver a **high-fidelity, minimalist, visual-first UI** that tra
 At the very top of the interface, a prominent, pill-shaped toggle switch controls the granularity of the entire central visualization area. 
 * **Aggregated:** Shows the macro-level predictive trend across all user demographics.
 * **Category:** Splits the data into overarching groupings (e.g., By Gender, By Income Bracket).
-* **Individual Type:** High-resolution view isolating specific intent predictions down to granular user cohorts.
+* **Individual Type:** High-resolution view isolating specific connection-stage predictions down to granular user cohorts.
 
 ### B. Central Line Charts (Absolute Monthly Trends)
 To ensure the design is data-dense but highly legible, the central charts avoid complex standardizations and focus solely on **absolute monthly values and trends**.
@@ -27,7 +27,7 @@ A non-intrusive filter menu allowing real-time slicing of the data.
 * **Categories:** Dynamically filter the predictions by Behavioral Metrics (App Usage Time, Match Rate, BMI).
 
 ### D. Real-Time Predictive Heat Map (Bottom/Split View)
-A visually striking matrix visualization showing the correlation density between user behaviors and their predicted Intent Class over time.
+A visually striking matrix visualization showing the correlation density between user behaviors and their predicted connection stage over time.
 * Colored using a continuous, minimalist gradient (e.g., deep indigo to vibrant cyan) indicating high vs. low absolute volume.
 * Updates instantaneously as the multi-select filters are adjusted.
 

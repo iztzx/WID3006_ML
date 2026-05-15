@@ -22,7 +22,7 @@ class FeatureStore:
     """Registry of all features used in the IntentSight pipeline."""
 
     # --- Target ---
-    TARGET: ClassVar[str] = "engagement_level"
+    TARGET: ClassVar[str] = "connection_stage"
 
     # --- Raw columns from the behaviour dataset ---
     RAW_NUMERIC: ClassVar[list[str]] = [
@@ -50,7 +50,7 @@ class FeatureStore:
         "interest_tags",
     ]
 
-    # --- Behavioral features used to construct engagement_level target ---
+    # --- Behavioral signals used to construct connection_stage target ---
     BEHAVIORAL_FEATURES: ClassVar[list[str]] = [
         "app_usage_time_min",
         "swipe_right_ratio",
@@ -85,14 +85,13 @@ class FeatureStore:
                 )
             )
 
-        # Target
         self.register(
             FeatureDefinition(
-                name="engagement_level",
-                description="3-class engagement level (Low/Medium/High) from composite behavioral score",
-                dtype="int64",
-                source_column="behavioral_composite",
-                transformation="zscore_sum_quantile",
+                name="connection_stage",
+                description="Five-stage connection readiness label for product actions",
+                dtype="object",
+                source_column="match_funnel_signals",
+                transformation="weak_supervised_connection_rules",
                 is_engineered=True,
             )
         )
@@ -100,11 +99,11 @@ class FeatureStore:
         # Engineered features
         engineered = [
             FeatureDefinition(
-                name="engagement_score",
-                description="Standardized sum of 5 behavioral features (before binning)",
+                name="connection_score",
+                description="Composite match, conversation, profile, and activity quality score",
                 dtype="float64",
-                source_column="behavioral",
-                transformation="zscore_sum",
+                source_column="match_funnel_signals",
+                transformation="weighted_bounded_score",
                 is_engineered=True,
             ),
             FeatureDefinition(
@@ -137,6 +136,54 @@ class FeatureStore:
                 dtype="int64",
                 source_column="interest_tags",
                 transformation="count",
+                is_engineered=True,
+            ),
+            FeatureDefinition(
+                name="profile_completeness",
+                description="Bounded score from profile photos, bio length, and interest count",
+                dtype="float64",
+                source_column="profile_pics_count",
+                transformation="weighted_profile_score",
+                is_engineered=True,
+            ),
+            FeatureDefinition(
+                name="selectivity_balance",
+                description="How close swipe behavior is to a balanced swiping pattern",
+                dtype="float64",
+                source_column="swipe_right_ratio",
+                transformation="distance_from_optimal_ratio",
+                is_engineered=True,
+            ),
+            FeatureDefinition(
+                name="conversation_depth",
+                description="Message volume adjusted by messages per match",
+                dtype="float64",
+                source_column="message_sent_count",
+                transformation="log_interaction",
+                is_engineered=True,
+            ),
+            FeatureDefinition(
+                name="match_quality",
+                description="Bounded match efficiency signal used by connection readiness",
+                dtype="float64",
+                source_column="mutual_matches",
+                transformation="weighted_bounded_score",
+                is_engineered=True,
+            ),
+            FeatureDefinition(
+                name="conversation_quality",
+                description="Bounded conversation signal used by connection readiness",
+                dtype="float64",
+                source_column="message_sent_count",
+                transformation="weighted_bounded_score",
+                is_engineered=True,
+            ),
+            FeatureDefinition(
+                name="profile_quality",
+                description="Bounded profile signal used by connection readiness",
+                dtype="float64",
+                source_column="profile_completeness",
+                transformation="weighted_bounded_score",
                 is_engineered=True,
             ),
         ]

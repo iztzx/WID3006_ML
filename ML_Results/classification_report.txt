@@ -1,11 +1,13 @@
-Best Model: Logistic Regression
+Best Model: CatBoost
 
-              precision    recall  f1-score   support
+                    precision    recall  f1-score   support
 
-           0       1.00      1.00      1.00      3334
-           1       1.00      1.00      1.00      3333
-           2       1.00      1.00      1.00      3333
+ Likely To Connect       0.98      0.97      0.97      2000
+   Mostly Browsing       0.95      0.95      0.95      1952
+Needs Profile Help       0.97      0.96      0.97      2000
+     Ready To Chat       0.96      0.97      0.97      2084
+ Swipes Too Freely       0.96      0.97      0.96      1964
 
-    accuracy                           1.00     10000
-   macro avg       1.00      1.00      1.00     10000
-weighted avg       1.00      1.00      1.00     10000
+          accuracy                           0.97     10000
+         macro avg       0.97      0.97      0.97     10000
+      weighted avg       0.97      0.97      0.97     10000

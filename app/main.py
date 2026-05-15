@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="IntentSight",
-    description="Defensible ML intent-signal explorer for dating-app behaviour data.",
+    description="Connection-readiness explorer for dating-app behaviour data.",
     version="3.0.0",
     lifespan=lifespan,
 )
@@ -89,7 +89,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Pydantic models
 # ---------------------------------------------------------------------------
 class ScenarioPayload(BaseModel):
-    """Single profile for point prediction."""
+    """Single profile for connection-readiness prediction."""
 
     app_usage_time_min: float = Field(120, ge=0, le=1000)
     swipe_right_ratio: float = Field(0.5, ge=0, le=1)
