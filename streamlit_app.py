@@ -313,7 +313,7 @@ def page_overview():
                 fig = px.treemap(dist, path=["Class"], values="Count")
 
             fig.update_layout(height=400, margin=dict(t=10, l=10, r=10, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     with right_col:
         if report_df is not None:
@@ -347,7 +347,7 @@ def page_overview():
                 },
             )
             fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # --- Insight card ---
     if comparison is not None:
@@ -402,7 +402,7 @@ def page_model_comparison():
                     "Train Time (s)": "{:.1f}",
                 }
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
         # --- Radar chart ---
@@ -440,7 +440,7 @@ def page_model_comparison():
                 polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
                 showlegend=True,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         # --- Interactive calibration curve ---
         st.subheader("Calibration Curves (Interactive)")
@@ -494,7 +494,7 @@ def page_model_comparison():
                     orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1
                 ),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         else:
             st.info("Model artifacts not available for calibration curves.")
 
@@ -507,7 +507,7 @@ def page_model_comparison():
                     "Nested CV Std": "{:.4f}",
                 }
             ),
-            use_container_width=True,
+            width="stretch",
         )
 
     # --- Insight card ---
@@ -550,18 +550,12 @@ def page_feature_importance():
 
             artifacts = load_artifacts()
             encoder = artifacts.get("target_encoder")
+            n_classes = len(encoder.classes_) if encoder is not None else 5
             class_names = (
-                (
-                    encoder.inverse_transform(range(shap_df.shape[1]))
-                    if encoder is not None
-                    else [f"Class {i}" for i in range(shap_df.shape[1])]
-                )
-                if shap_df is not None
-                else []
+                encoder.inverse_transform(range(n_classes))
+                if encoder is not None
+                else [f"Class {i}" for i in range(n_classes)]
             )
-
-            # Per-class SHAP
-            n_classes = 5
             selected_class = st.selectbox(
                 "Select class for SHAP values",
                 range(n_classes),
@@ -601,7 +595,7 @@ def page_feature_importance():
                     xaxis_title="Mean |SHAP|",
                     yaxis_title="",
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
                 # Feature insights
                 top3 = importance_df.head(3)["feature"].tolist()
@@ -654,12 +648,12 @@ def page_feature_importance():
                         xaxis_title="Importance",
                         yaxis_title="",
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
             except Exception as e:
                 st.warning(f"Could not extract native importance: {e}")
         fi_path = PREPROCESSED_DIR / "feature_importances.png"
         if fi_path.exists():
-            st.image(str(fi_path), use_container_width=True)
+            st.image(str(fi_path), width="stretch")
 
     with tab_corr:
         if "X_train_selected_unresampled" in data:
@@ -695,7 +689,7 @@ def page_feature_importance():
                 fig.update_layout(
                     height=max(400, len(selected_cols) * 30),
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
                 # Find highest/lowest correlations
                 mask = np.triu(np.ones_like(corr, dtype=bool), k=1)
@@ -761,7 +755,7 @@ def _render_shap_beeswarm(
         xaxis_title=f"SHAP Value ({class_names[class_idx] if class_idx < len(class_names) else f'Class {class_idx}'})",
         yaxis_title="",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 # ===========================================================================
@@ -897,7 +891,7 @@ def page_scenario_predictor():
                 xaxis_range=[0, 1],
                 showlegend=False,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         with col_b:
             confidence = float(np.max(proba))
@@ -918,7 +912,7 @@ def page_scenario_predictor():
                 )
             )
             fig.update_layout(height=300)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # --- Comparison with dataset averages ---
     st.subheader("Your Profile vs Dataset Averages")
@@ -968,7 +962,7 @@ def page_scenario_predictor():
                 barmode="group",
                 xaxis_title="Value",
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             # Highlight outliers
             outliers = compare_df[compare_df["Z-Score"].abs() > 1.5]
@@ -1043,7 +1037,7 @@ def page_scenario_predictor():
             xaxis_title="Max probability change (±10% perturbation)",
             yaxis_title="",
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # OOD warning
     ood_features = []
@@ -1162,7 +1156,7 @@ def page_data_explorer():
                     title=f"Distribution of {selected_col}",
                 )
                 fig.update_layout(height=450)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
     with tab_scatter:
         numeric_cols = filtered.select_dtypes(include=[np.number]).columns.tolist()
@@ -1199,7 +1193,7 @@ def page_data_explorer():
                 hover_data=cat_cols[:3],
             )
             fig.update_layout(height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     with tab_insights:
         st.subheader("Auto-Generated Insights")
@@ -1208,8 +1202,8 @@ def page_data_explorer():
             st.markdown(f"- {insight}")
 
     with tab_preview:
-        st.dataframe(filtered.head(100), use_container_width=True)
-        st.dataframe(filtered.describe(), use_container_width=True)
+        st.dataframe(filtered.head(100), width="stretch")
+        st.dataframe(filtered.describe(), width="stretch")
 
 
 def _generate_insights(df: pd.DataFrame) -> list[str]:
@@ -1320,7 +1314,7 @@ def page_audit_log():
             title="Predictions Over Time",
         )
         fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # --- Prediction distribution + confidence ---
     col1, col2 = st.columns(2)
@@ -1329,7 +1323,7 @@ def page_audit_log():
             pred_counts = df["prediction"].value_counts().reset_index()
             pred_counts.columns = ["Prediction", "Count"]
             fig = px.pie(pred_counts, names="Prediction", values="Count", hole=0.35)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     with col2:
         if "confidence" in df.columns and df["confidence"].notna().any():
@@ -1340,7 +1334,7 @@ def page_audit_log():
                 title="Confidence Distribution",
                 color="prediction",
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # --- OOD flag analysis ---
     if "n_ood_flags" in df.columns and df["n_ood_flags"].sum() > 0:
@@ -1368,11 +1362,11 @@ def page_audit_log():
                 title="Most Frequently OOD Features",
             )
             fig.update_layout(height=300)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
     # --- Recent predictions table ---
     st.subheader("Recent Predictions")
-    st.dataframe(df.tail(50).iloc[::-1], use_container_width=True)
+    st.dataframe(df.tail(50).iloc[::-1], width="stretch")
 
     # --- Export ---
     csv_data = df.to_csv(index=False)
@@ -1494,14 +1488,14 @@ def _render_drift_tab(data: dict) -> None:
         x=0.25, line_dash="dash", line_color="red", annotation_text="PSI=0.25"
     )
     fig.update_layout(height=450)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # Table
     st.dataframe(
         drift_df.style.format(
             {"PSI": "{:.4f}", "KS Statistic": "{:.4f}", "KS p-value": "{:.4f}"}
         ),
-        use_container_width=True,
+        width="stretch",
         height=400,
     )
 
@@ -1545,7 +1539,7 @@ def _render_confidence_tab(model, data: dict, artifacts: dict) -> None:
         color_discrete_map={"Correct": "#2ecc71", "Incorrect": "#e74c3c"},
     )
     fig.update_layout(height=400)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # Per-class confidence
     class_names = encoder.inverse_transform(range(proba.shape[1]))
@@ -1628,7 +1622,7 @@ def _render_error_tab(model, data: dict, artifacts: dict) -> None:
         yaxis_title="True",
         yaxis=dict(autorange="reversed"),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # Sankey diagram: true -> predicted flows
     st.subheader("Misclassification Flow")
@@ -1669,7 +1663,7 @@ def _render_error_tab(model, data: dict, artifacts: dict) -> None:
         fig.update_layout(
             height=400, title="True Class -> Predicted Class (Errors Only)"
         )
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # Per-class error breakdown
     error_records = []
@@ -1688,7 +1682,7 @@ def _render_error_tab(model, data: dict, artifacts: dict) -> None:
 
     if error_records:
         st.dataframe(
-            pd.DataFrame(error_records), use_container_width=True, hide_index=True
+            pd.DataFrame(error_records), width="stretch", hide_index=True
         )
 
 
@@ -1767,7 +1761,7 @@ def _render_interactions_tab(model, data: dict, artifacts: dict) -> None:
                 title=f"Prediction Confidence: {feat_a} vs {feat_b}",
             )
             fig.update_layout(height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             st.info(
                 "This heatmap shows the model's maximum predicted probability "
