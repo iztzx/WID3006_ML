@@ -64,15 +64,16 @@ def add_connection_features(frame: pd.DataFrame) -> pd.DataFrame:
     engineered["num_interests"] = _num_interests(engineered)
     engineered["match_rate"] = matches / (likes + 1)
     engineered["msg_per_match"] = messages / (matches + 1)
-    engineered["bmi"] = np.where(height > 0, weight / ((height / 100) ** 2), 0)
+    if "height_cm" in frame.columns and "weight_kg" in frame.columns:
+        engineered["bmi"] = np.where(height > 0, weight / ((height / 100) ** 2), 0)
     engineered["profile_completeness"] = (
         profile_pics.clip(0, 6) / 6 * 0.40
         + bio_length.clip(0, 300) / 300 * 0.40
         + engineered["num_interests"].clip(0, 5) / 5 * 0.20
     )
-    engineered["selectivity_balance"] = (
-        1 - (swipe_ratio - 0.55).abs() / 0.55
-    ).clip(0, 1)
+    engineered["selectivity_balance"] = (1 - (swipe_ratio - 0.55).abs() / 0.55).clip(
+        0, 1
+    )
     engineered["swipe_excess"] = (swipe_ratio - 0.70).clip(lower=0)
     engineered["like_to_match_gap"] = (likes - matches).clip(lower=0)
     engineered["conversation_depth"] = np.log1p(messages) * np.log1p(
@@ -115,10 +116,9 @@ def add_connection_features(frame: pd.DataFrame) -> pd.DataFrame:
         + 0.35 * (1 - _bounded(messages, 80))
         + 0.20 * (1 - _bounded(matches, 40))
     )
-    engineered["swipe_issue"] = (
-        0.55 * _bounded(engineered["swipe_excess"], 0.30)
-        + 0.45 * (1 - engineered["match_rate"].clip(0, 1))
-    )
+    engineered["swipe_issue"] = 0.55 * _bounded(
+        engineered["swipe_excess"], 0.30
+    ) + 0.45 * (1 - engineered["match_rate"].clip(0, 1))
 
     return engineered
 
@@ -143,9 +143,7 @@ def construct_connection_stage(frame: pd.DataFrame) -> pd.Series:
     ] = "Mostly Browsing"
 
     middle = labels.eq("Ready To Chat")
-    labels[middle & (swipe_issue >= swipe_issue.quantile(0.50))] = (
-        "Swipes Too Freely"
-    )
+    labels[middle & (swipe_issue >= swipe_issue.quantile(0.50))] = "Swipes Too Freely"
 
     ordered = pd.Categorical(labels, categories=STAGE_LABELS, ordered=True)
     return pd.Series(ordered, index=labels.index).astype(str)
