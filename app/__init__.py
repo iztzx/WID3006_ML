@@ -1,1 +1,0 @@
-"""IntentSight dashboard application."""
