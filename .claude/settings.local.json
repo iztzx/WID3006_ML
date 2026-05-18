@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import json; nb=json.load\\(open\\('ConnectionLens_Colab.ipynb'\\)\\); cell=nb['cells'][8]; print\\(''.join\\(cell['source']\\)\\)\")"
+    ]
+  }
+}

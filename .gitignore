@@ -28,6 +28,42 @@ ML_Results/*.png
 ML_Results/*.csv
 ML_Results/*.jsonl
 catboost_info/
+Preprocessed_Data_V2/
+
+# Dataset (loaded via kagglehub at runtime)
+Behaviour_Extended_Dataset.csv
+Behaviour_Dataset.csv
+
+# Standalone modules (logic is inlined in notebook)
+connection_scoring.py
+feature_store.py
+streamlit_app.py
+_connectionlens_dashboard.py
+hyperparameter_tuning.py
+
+# Reports (binary, not diffable)
+*.docx
+
+# Deployment / CI (not needed for notebook workflow)
+Dockerfile
+Dockerfile.streamlit
+docker-compose.yml
+.github/
+.streamlit/
+.env.example
+
+# Standalone scripts (logic is in notebook)
+preprocess.py
+train.py
+compute_shap*.py
+logging_config.py
+performance_tracker.py
+dashboard_product_plan.md
+
+# App (not needed for notebook deliverable)
+app/
+tests/
+docs/
 
 # Logs
 *.log

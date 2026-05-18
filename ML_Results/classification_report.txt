@@ -1,0 +1,13 @@
+Best Model: Stacking Ensemble
+
+                    precision    recall  f1-score   support
+
+ Likely To Connect       0.99      0.99      0.99      2000
+   Mostly Browsing       0.98      0.97      0.97      1952
+Needs Profile Help       0.98      0.99      0.99      2000
+     Ready To Chat       0.98      0.98      0.98      2084
+ Swipes Too Freely       0.98      0.98      0.98      1964
+
+          accuracy                           0.98     10000
+         macro avg       0.98      0.98      0.98     10000
+      weighted avg       0.98      0.98      0.98     10000
