@@ -117,7 +117,7 @@ connection_score = 0.35 x match_quality
 | `bmi` | `weight_kg / (height_cm / 100)^2` |
 | `num_interests` | Count of parsed `interest_tags` |
 | `profile_completeness` | `pics/6 x 0.4 + bio/300 x 0.4 + interests/5 x 0.2` |
-| `selectivity_balance` | `1 - |swipe_ratio - 0.55| / 0.55`, clipped [0,1] |
+| `selectivity_balance` | `1 - abs(swipe_ratio - 0.55) / 0.55`, clipped [0,1] |
 | `swipe_excess` | `max(swipe_ratio - 0.70, 0)` |
 | `like_to_match_gap` | `max(likes - matches, 0)` |
 | `conversation_depth` | `log1p(messages) x log1p(msg_per_match)` |
@@ -293,6 +293,7 @@ The notebook contains 33 cells (16 markdown, 17 code) organized as follows:
 .
 ├── ConnectionLens_Colab.ipynb                    Self-contained Colab notebook (primary deliverable)
 ├── README.md                                     This file
+├── requirements.txt                              Python dependencies for local execution
 ├── dating_app_behavior_dataset.csv               Original dataset (19 columns, 50K rows)
 ├── dating_app_behavior_dataset_extended1.csv     Extended dataset (25 columns, used by notebook)
 ├── WIA1006_WID3006_Group Assignment_2526.pdf     Assignment brief
@@ -308,7 +309,7 @@ The notebook contains 33 cells (16 markdown, 17 code) organized as follows:
 
 ## Dependencies
 
-All dependencies are installed within the Colab notebook (Section 1). No `requirements.txt` needed.
+All dependencies are installed within the Colab notebook (Section 1). For local execution, install with `pip install -r requirements.txt`.
 
 | Category | Packages |
 | --- | --- |
@@ -351,4 +352,4 @@ Quick reference for graders — maps each assignment deliverable to the relevant
 
 ---
 
-*WID3006 Machine Learning group project at Universiti Malaya — "Tying the Data Knot."*
+### WID3006 Machine Learning group project at Universiti Malaya — "Tying the Data Knot."
