@@ -74,7 +74,7 @@ connection_score = 0.35 x match_quality
 | **Categorical (12)** | `gender`, `income_bracket`, `education_level`, `sexual_orientation`, `location_type`, `swipe_time_of_day`, `body_type`, `zodiac_sign`, `interest_tags`, `app_usage_time_label`, `swipe_right_label`, `relationship_intent` |
 | **Derived (2)** | `swipe_right_ratio`, `engagement_score` |
 
-`match_outcome` is also present. `bmi`, `num_interests`, and 16 other features are engineered during preprocessing (see Feature Engineering). `app_usage_time_label` and `swipe_right_label` are dropped after encoding as redundant with their numeric counterparts.
+`match_outcome` is also present. `bmi`, `num_interests`, and 16 other features are engineered during preprocessing (see Feature Engineering). `app_usage_time_label` and `swipe_right_label` are dropped before encoding as redundant with their numeric counterparts.
 
 **Data quality:** No critical missing values. Duplicates and nulls handled during preprocessing.
 
@@ -141,7 +141,7 @@ Random Forest (300 trees) trained on all features -> ranked by importance -> top
 
 > Deliverable D3 / 4.5-4.8 — Split, CV, Model Selection, Tuning
 
-Fully reproducible (`random_state=42`). All parameters centralized in the `CONFIG` dict.
+Fully reproducible (`random_state=42`). Core settings are centralized in the `CONFIG` dict, including scoring weights, pipeline settings, base model defaults, SHAP settings, and AutoML budget; the Optuna tuning cell defines the model-specific Bayesian search spaces.
 
 ### Train/Test Split [4.5]
 
@@ -255,7 +255,7 @@ Sensitivity analysis in the dashboard perturbs each input feature by +/-10% and 
 
 ### Fairness Considerations
 
-The model does not use protected attributes (gender, sexual_orientation) as direct predictors after one-hot encoding. Predictions are product signals for intervention design, not claims about user worth or intent.
+The synthetic source data includes demographic attributes such as `gender` and `sexual_orientation`, which are one-hot encoded before feature selection. For production use, these fields should be audited for group-level performance and may be excluded or constrained depending on policy requirements. Predictions are product signals for intervention design, not claims about user worth or intent.
 
 ---
 
@@ -267,15 +267,17 @@ The model does not use protected attributes (gender, sexual_orientation) as dire
 
 Full pipeline in-browser, ~10-15 min on free T4 GPU. Handles installs, EDA, preprocessing, training, tuning, SHAP, calibration, and artifact export. Self-contained — no repo clone needed.
 
+The repository intentionally does not track datasets or generated model artifacts. The notebook fetches the dataset with `kagglehub` and regenerates outputs such as `ML_Results/`, `Preprocessed_Data_V2/`, and the optional Streamlit dashboard script.
+
 The notebook contains 33 cells (16 markdown, 17 code) organized as follows:
 
 1. Install dependencies
-2. Configuration (centralized `CONFIG` dict with scoring weights, pipeline settings, model hyperparameters, Optuna search spaces)
+2. Configuration (centralized `CONFIG` dict with scoring weights, pipeline settings, model hyperparameters, SHAP settings, and AutoML budget)
 3. Load dataset (via `kagglehub` from Kaggle)
 4. Exploratory Data Analysis (distributions, correlations)
 5. Connection scoring and feature engineering (18 engineered features)
 6. Preprocessing and target construction (encoding, scaling, RF-based feature selection → 66 features)
-7. Train 6 models with 5-fold CV (SMOTE in pipeline)
+7. Train six models with 5-fold CV (SMOTE in pipeline)
 8. Optuna hyperparameter tuning (60 trials per model, TPE sampler)
 9. Stacking Ensemble + Soft-Voting construction, isotonic calibration
 10. SHAP interpretability (beeswarm, bar, feature importance)
@@ -294,16 +296,18 @@ The notebook contains 33 cells (16 markdown, 17 code) organized as follows:
 ├── ConnectionLens_Colab.ipynb                    Self-contained Colab notebook (primary deliverable)
 ├── README.md                                     This file
 ├── requirements.txt                              Python dependencies for local execution
-├── dating_app_behavior_dataset.csv               Original dataset (19 columns, 50K rows)
-├── dating_app_behavior_dataset_extended1.csv     Extended dataset (25 columns, used by notebook)
 ├── WIA1006_WID3006_Group Assignment_2526.pdf     Assignment brief
 └── .gitignore
 ```
 
-**Generated at runtime (gitignored except where noted):**
+**Ignored local files generated or fetched at runtime:**
 
+- `dating_app_behavior_dataset_extended1.csv` — 25-column Kaggle dataset used by the notebook
+- `dating_app_behavior_dataset.csv` — original Kaggle dataset copy, if present locally
 - `Preprocessed_Data_V2/` — train/test splits (`X_train_selected_unresampled.csv`, `X_test_selected.csv`, `y_train_original.csv`, `y_test.csv`), scaler, encoder, selected features
-- `ML_Results/` — trained model (`best_tuned_model.pkl`), comparison table (`final_comparison.csv`), classification report (`classification_report.txt` — committed), test features, scaler, encoder
+- `ML_Results/` — trained model (`best_tuned_model.pkl`), comparison table (`final_comparison.csv`), generated classification report (`classification_report.txt`), test features, scaler, encoder
+- `_connectionlens_dashboard.py` — optional Streamlit dashboard generated by the notebook
+- `catboost_info/` and `docs/` — runtime output folders
 
 ---
 
